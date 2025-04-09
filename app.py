@@ -5,9 +5,16 @@ import zipfile
 from io import BytesIO
 import re
 
-st.set_page_config(page_title="Meal Cart Manifest Generator", layout="centered")
-st.title("Meal Cart Manifest Generator")
+st.set_page_config(page_title="CM Logistics Manifest Generator", layout="centered")
+
+# Display logo
+st.image("CM_Logistics_Top_Logo.png", use_column_width=True)
+
+st.title("CM Logistics Manifest Generator")
 st.markdown("Upload your orders export CSV and we'll return CM, MC, and Other manifests in a ZIP file.")
+
+# Group selector
+group_option = st.selectbox("Select Group Name:", ["Clean Eats Australia", "Made Active"])
 
 uploaded_file = st.file_uploader("Upload orders_export CSV file", type="csv")
 
@@ -67,7 +74,7 @@ if uploaded_file:
             "Phone No.": phone,
             "Time Window": "0600-1800",
             "City": city,
-            "Group": "Clean Eats Australia",
+            "Group": group_option,
             "No. of Shipping Labels": labels,
             "Instructions": order["Notes"]
         })

@@ -11,14 +11,16 @@ st.set_page_config(page_title="CM Logistics Manifest Generator", layout="centere
 st.image("CM_Logistics_Top_Logo.png", use_container_width=True)
 
 st.title("CM Logistics Manifest Generator")
-st.markdown("Upload your orders export CSV and we'll return CM, MC, and Other manifests in a ZIP file.")
+st.markdown("Upload your orders export CSV, choose the group, then click Generate to get your manifests.")
 
 # Group selector
 group_option = st.selectbox("Select Group Name:", ["Clean Eats Australia", "Made Active"])
 
 uploaded_file = st.file_uploader("Upload orders_export CSV file", type="csv")
 
-if uploaded_file:
+generate = st.button("Generate Manifests")
+
+if uploaded_file and generate:
     orders_df = pd.read_csv(uploaded_file)
 
     # Clean and prep

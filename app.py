@@ -8,7 +8,7 @@ import re
 st.set_page_config(page_title="CM Logistics Manifest Generator", layout="centered")
 
 # Display logo
-st.image("CM_Logistics_Top_Logo.png", use_column_width=True)
+st.image("CM_Logistics_Top_Logo.png", use_container_width=True)
 
 st.title("CM Logistics Manifest Generator")
 st.markdown("Upload your orders export CSV and we'll return CM, MC, and Other manifests in a ZIP file.")

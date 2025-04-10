@@ -97,6 +97,15 @@ if uploaded_file and generate:
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Manifest')
+
+                # Set Phone No. column to text format in Excel
+                workbook = writer.book
+                worksheet = writer.sheets['Manifest']
+                text_fmt = workbook.add_format({'num_format': '@'})
+                if "Phone No." in df.columns:
+                    col_index = df.columns.get_loc("Phone No.")
+                    worksheet.set_column(col_index, col_index, None, text_fmt)
+
             zipf.writestr(filename, buffer.getvalue())
 
         add_to_zip(cm_manifest, "CM_Manifest.xlsx")

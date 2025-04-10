@@ -97,6 +97,9 @@ if uploaded_file and generate:
             buffer = BytesIO()
 
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                # Ensure Phone No. column is stored as string
+                if "Phone No." in df.columns:
+                    df["Phone No."] = df["Phone No."].astype(str)
                 df.to_excel(writer, index=False, sheet_name='Manifest')
 
                 # Set Phone No. column to text format in Excel

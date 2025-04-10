@@ -96,10 +96,6 @@ if uploaded_file and generate:
         def add_to_zip(df, filename):
             buffer = BytesIO()
 
-            # Convert Phone No. column to string explicitly
-            if "Phone No." in df.columns:
-                df["Phone No."] = df["Phone No."].astype(str)
-
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name='Manifest')
 

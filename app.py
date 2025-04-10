@@ -73,7 +73,7 @@ if uploaded_file and generate:
             "State": state,
             "Country": country,
             "Deliver to": order["Shipping Name"],
-            "Phone No.": str(phone),
+            "Phone No.": phone,
             "Time Window": "0600-1800",
             "City": city,
             "Group": group_option,
@@ -97,9 +97,6 @@ if uploaded_file and generate:
             buffer = BytesIO()
 
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                # Ensure Phone No. column is stored as string
-                if "Phone No." in df.columns:
-                    df = df.astype({"Phone No.": "object"})
                 df.to_excel(writer, index=False, sheet_name='Manifest')
 
                 # Set Phone No. column to text format in Excel

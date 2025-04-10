@@ -73,7 +73,7 @@ if uploaded_file and generate:
             "State": state,
             "Country": country,
             "Deliver to": order["Shipping Name"],
-            "Phone No.": phone,
+            "Phone No.": str(phone),
             "Time Window": "0600-1800",
             "City": city,
             "Group": group_option,

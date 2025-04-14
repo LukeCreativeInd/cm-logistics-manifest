@@ -101,6 +101,7 @@ if uploaded_file and generate:
 
     # Add Cold Express row if selected
     if cold_required:
+        total_cartons = int(cx_manifest["No. of Shipping Labels"].sum()) if not cx_manifest.empty else ""
         today_str = datetime.now().strftime("%d/%m/%Y")
         cold_row = {
             "D.O. No.": "CXMANIFEST",
@@ -115,7 +116,7 @@ if uploaded_file and generate:
             "Time Window": "0600-1800",
             "City": "Melbourne",
             "Group": "Clean Eats Australia",
-            "No. of Shipping Labels": "",
+            "No. of Shipping Labels": total_cartons,
             "Line Items": "",
             "Instructions": ""
         }
@@ -173,7 +174,7 @@ if uploaded_file and generate:
             wb = load_workbook("cx_manifest_template.xlsx")
             ws = wb.active
 
-            for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=4):
+            for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=6):
                 for c_idx, value in enumerate(row, start=1):
                     cell = ws.cell(row=r_idx, column=c_idx)
                     if cell.coordinate in ws.merged_cells:

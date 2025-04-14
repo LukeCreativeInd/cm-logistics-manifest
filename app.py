@@ -177,7 +177,7 @@ if uploaded_file and generate:
                 template_df = pd.read_excel("cx_manifest_template.xlsx", header=None, nrows=3)
                 for row_idx, row in template_df.iterrows():
                     for col_idx, val in enumerate(row):
-                        worksheet.write(row_idx, col_idx, val)
+                        worksheet.write(row_idx, col_idx, str(val) if not pd.isna(val) else "")
 
                 # Write cx_ready_body below header (starting at row 3)
                 for r_idx, row in cx_ready_body.iterrows():

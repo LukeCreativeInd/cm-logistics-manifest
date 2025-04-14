@@ -95,14 +95,12 @@ if uploaded_file and generate:
     with zipfile.ZipFile(output, "w") as zipf:
         def add_to_zip(df, filename):
             buffer = BytesIO()
-
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 if "Phone No." in df.columns:
-    df["Phone No."] = df["Phone No."].astype(str).str.replace(r"\.0$", "", regex=True)
+                    df["Phone No."] = df["Phone No."].astype(str).str.replace(r"\.0$", "", regex=True)
 
-df.to_excel(writer, index=False, sheet_name='Manifest')
+                df.to_excel(writer, index=False, sheet_name='Manifest')
 
-                # Set Phone No. column to text format in Excel
                 workbook = writer.book
                 worksheet = writer.sheets['Manifest']
                 text_fmt = workbook.add_format({'num_format': '@'})

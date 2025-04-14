@@ -82,6 +82,7 @@ if uploaded_file and generate:
             "City": city,
             "Group": group_option,
             "No. of Shipping Labels": labels,
+            "Line Items": total_qty,
             "Instructions": order["Notes"]
         })
 
@@ -114,9 +115,30 @@ if uploaded_file and generate:
             "City": "Melbourne",
             "Group": "Clean Eats Australia",
             "No. of Shipping Labels": "",
+            "Line Items": "",
             "Instructions": ""
         }
         mc_manifest = pd.concat([mc_manifest, pd.DataFrame([cold_row])], ignore_index=True)
+
+    # Build CX Ready Manifest
+    if not cx_manifest.empty:
+        cx_ready = pd.DataFrame({
+            "INV NO.": cx_manifest["D.O. No."],
+            "DELIVERY DATE": cx_manifest["Date"],
+            "STORE NO": "",
+            "STORE NAME": cx_manifest["Deliver to"],
+            "ADDRESS": cx_manifest["Address 1"],
+            "SUBURB": cx_manifest["Address 2"],
+            "STATE": cx_manifest["State"],
+            "POSTCODE": cx_manifest["Postal Code"],
+            "CARTONS": cx_manifest["No. of Shipping Labels"],
+            "PALLETS": "",
+            "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
+            "INV. VALUE": "",
+            "COD": "",
+            "TEMP": "chilled",
+            "COMMENT": cx_manifest["Instructions"]
+        })
 
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
@@ -127,7 +149,6 @@ if uploaded_file and generate:
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 if "Phone No." in df.columns:
                     df["Phone No."] = df["Phone No."].astype(str).str.replace(r"\.0$", "", regex=True)
-
                 df.to_excel(writer, index=False, sheet_name='Manifest')
 
                 workbook = writer.book
@@ -143,6 +164,10 @@ if uploaded_file and generate:
         add_to_zip(mc_manifest, "MC_Manifest.xlsx")
         add_to_zip(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip(other_manifest, "Other_Manifest.xlsx")
+        if not cx_manifest.empty:
+            cx_buffer = BytesIO()
+            cx_ready.to_excel(cx_buffer, index=False, sheet_name='Manifest')
+            zipf.writestr("CX_Ready_Manifest.xlsx", cx_buffer.getvalue())
 
     output.seek(0)
     st.download_button(

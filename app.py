@@ -122,23 +122,29 @@ if uploaded_file and generate:
 
     # Build CX Ready Manifest
     if not cx_manifest.empty:
-        cx_ready = pd.DataFrame({
-            "INV NO.": cx_manifest["D.O. No."],
-            "DELIVERY DATE": cx_manifest["Date"],
-            "STORE NO": "",
-            "STORE NAME": cx_manifest["Deliver to"],
-            "ADDRESS": cx_manifest["Address 1"],
-            "SUBURB": cx_manifest["Address 2"],
-            "STATE": cx_manifest["State"],
-            "POSTCODE": cx_manifest["Postal Code"],
-            "CARTONS": cx_manifest["No. of Shipping Labels"],
-            "PALLETS": "",
-            "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
-            "INV. VALUE": "",
-            "COD": "",
-            "TEMP": "chilled",
-            "COMMENT": cx_manifest["Instructions"]
-        })
+        from datetime import timedelta
+
+cx_template = pd.read_excel("CX Manifest Template.xlsx", header=None, nrows=3)
+cx_ready_header = cx_template
+cx_ready_body = pd.DataFrame({
+    "INV NO.": cx_manifest["D.O. No."],
+    "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
+    "STORE NO": "",
+    "STORE NAME": cx_manifest["Deliver to"],
+    "ADDRESS": cx_manifest["Address 1"],
+    "SUBURB": cx_manifest["Address 2"],
+    "STATE": cx_manifest["State"],
+    "POSTCODE": cx_manifest["Postal Code"],
+    "CARTONS": cx_manifest["No. of Shipping Labels"],
+    "PALLETS": "",
+    "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
+    "INV. VALUE": "",
+    "COD": "",
+    "TEMP": "chilled",
+    "COMMENT": cx_manifest["Instructions"]
+})
+cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
+cx_ready = pd.concat([cx_ready_header, cx_ready_body], ignore_index=True)
 
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
@@ -166,7 +172,14 @@ if uploaded_file and generate:
         add_to_zip(other_manifest, "Other_Manifest.xlsx")
         if not cx_manifest.empty:
             cx_buffer = BytesIO()
-            cx_ready.to_excel(cx_buffer, index=False, sheet_name='Manifest')
+            with pd.ExcelWriter(cx_buffer, engine='xlsxwriter') as writer:
+                cx_ready.to_excel(writer, index=False, header=False, sheet_name='Manifest')
+                workbook = writer.book
+                worksheet = writer.sheets['Manifest']
+                worksheet.set_column('A:O', 20)
+                worksheet.write('B1', 'Clean Eats')
+                yellow_format = workbook.add_format({'bg_color': '#FFFF00'})
+                worksheet.write('B2', '<-- This must change for each manifest', yellow_format)
             zipf.writestr("CX_Ready_Manifest.xlsx", cx_buffer.getvalue())
 
     output.seek(0)

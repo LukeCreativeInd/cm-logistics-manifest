@@ -104,13 +104,13 @@ if uploaded_file and generate:
             "Address 1": "830 Wellington Rd",
             "Address 2": "Rowville",
             "Postal Code": 3178,
-            "State": "VIC",
+            "State": "Victoria",
             "Country": "Australia",
             "Deliver to": "Cold Xpress",
             "Phone No.": "",
             "Time Window": "0600-1800",
             "City": "Melbourne",
-            "Group": "Clean Eats Group",
+            "Group": "Clean Eats Australia",
             "No. of Shipping Labels": "",
             "Instructions": ""
         }

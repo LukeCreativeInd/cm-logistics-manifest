@@ -153,7 +153,8 @@ if uploaded_file and generate:
 
         for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=4):
             for c_idx, value in enumerate(row, start=1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
+                safe_value = "" if pd.isna(value) else value
+                ws.cell(row=r_idx, column=c_idx, value=safe_value)
 
         from tempfile import NamedTemporaryFile
         with NamedTemporaryFile() as tmp:

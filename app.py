@@ -4,6 +4,7 @@ import math
 import zipfile
 from io import BytesIO
 import re
+from datetime import datetime
 
 st.set_page_config(page_title="CM Logistics Manifest Generator", layout="centered")
 
@@ -15,6 +16,9 @@ st.markdown("Upload your orders export CSV, choose the group, then click Generat
 
 # Group selector
 group_option = st.selectbox("Select Group Name:", ["Clean Eats Australia", "Made Active"])
+
+# Cold Express checkbox
+cold_required = st.checkbox("Is there a Cold Express Pickup Required?")
 
 uploaded_file = st.file_uploader("Upload orders_export CSV file", type="csv")
 
@@ -91,9 +95,32 @@ if uploaded_file and generate:
     mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
+    # Add Cold Express row if selected
+    if cold_required:
+        today_str = datetime.now().strftime("%d/%m/%Y")
+        cold_row = {
+            "D.O. No.": "CXMANIFEST",
+            "Date": today_str,
+            "Address 1": "830 Wellington Rd",
+            "Address 2": "Rowville",
+            "Postal Code": 3178,
+            "State": "VIC",
+            "Country": "Australia",
+            "Deliver to": "Cold Xpress",
+            "Phone No.": "",
+            "Time Window": "0600-1800",
+            "City": "Melbourne",
+            "Group": "Clean Eats Group",
+            "No. of Shipping Labels": "",
+            "Instructions": ""
+        }
+        mc_manifest = pd.concat([mc_manifest, pd.DataFrame([cold_row])], ignore_index=True)
+
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
         def add_to_zip(df, filename):
+            if df.empty:
+                return
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 if "Phone No." in df.columns:

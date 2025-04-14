@@ -122,48 +122,69 @@ if uploaded_file and generate:
         mc_manifest = pd.concat([mc_manifest, pd.DataFrame([cold_row])], ignore_index=True)
 
     # Build CX Ready Manifest
-    if not cx_manifest.empty:
-        from datetime import timedelta
-        from openpyxl import load_workbook
-        from openpyxl.utils.dataframe import dataframe_to_rows
+    output = BytesIO()
+    with zipfile.ZipFile(output, "w") as zipf:
+        def add_to_zip(df, filename):
+            if df.empty:
+                return
+            buffer = BytesIO()
+            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                if "Phone No." in df.columns:
+                    df["Phone No."] = df["Phone No."].astype(str).str.replace(r"\.0$", "", regex=True)
+                df.to_excel(writer, index=False, sheet_name='Manifest')
+                workbook = writer.book
+                worksheet = writer.sheets['Manifest']
+                text_fmt = workbook.add_format({'num_format': '@'})
+                if "Phone No." in df.columns:
+                    col_index = df.columns.get_loc("Phone No.")
+                    worksheet.set_column(col_index, col_index, None, text_fmt)
+            zipf.writestr(filename, buffer.getvalue())
 
-        # Prepare the body
-        cx_ready_body = pd.DataFrame({
-            "INV NO.": cx_manifest["D.O. No."],
-            "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
-            "STORE NO": "",
-            "STORE NAME": cx_manifest["Deliver to"],
-            "ADDRESS": cx_manifest["Address 1"],
-            "SUBURB": cx_manifest["Address 2"],
-            "STATE": cx_manifest["State"],
-            "POSTCODE": cx_manifest["Postal Code"],
-            "CARTONS": cx_manifest["No. of Shipping Labels"],
-            "PALLETS": "",
-            "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
-            "INV. VALUE": "",
-            "COD": "",
-            "TEMP": "chilled",
-            "COMMENT": cx_manifest["Instructions"]
-        })
-        cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
+        add_to_zip(cm_manifest, "CM_Manifest.xlsx")
+        add_to_zip(mc_manifest, "MC_Manifest.xlsx")
+        add_to_zip(cx_manifest, "CX_Manifest.xlsx")
+        add_to_zip(other_manifest, "Other_Manifest.xlsx")
 
-        # Load template and write data
-        wb = load_workbook("cx_manifest_template.xlsx")
-        ws = wb.active
+        if not cx_manifest.empty:
+            from datetime import timedelta
+            from openpyxl import load_workbook
+            from openpyxl.utils.dataframe import dataframe_to_rows
+            from tempfile import NamedTemporaryFile
 
-        for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=4):
-            for c_idx, value in enumerate(row, start=1):
-                cell = ws.cell(row=r_idx, column=c_idx)
-                if cell.coordinate in ws.merged_cells:  # avoid merged cell overwrite
-                    continue
-                safe_value = "" if pd.isna(value) else str(value)
-                cell.value = safe_value
+            cx_ready_body = pd.DataFrame({
+                "INV NO.": cx_manifest["D.O. No."],
+                "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
+                "STORE NO": "",
+                "STORE NAME": cx_manifest["Deliver to"],
+                "ADDRESS": cx_manifest["Address 1"],
+                "SUBURB": cx_manifest["Address 2"],
+                "STATE": cx_manifest["State"],
+                "POSTCODE": cx_manifest["Postal Code"],
+                "CARTONS": cx_manifest["No. of Shipping Labels"],
+                "PALLETS": "",
+                "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
+                "INV. VALUE": "",
+                "COD": "",
+                "TEMP": "chilled",
+                "COMMENT": cx_manifest["Instructions"]
+            })
+            cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
 
-        from tempfile import NamedTemporaryFile
-        with NamedTemporaryFile() as tmp:
-            wb.save(tmp.name)
-            tmp.seek(0)
-            zipf.writestr("CX_Ready_Manifest.xlsx", tmp.read())
+            wb = load_workbook("cx_manifest_template.xlsx")
+            ws = wb.active
+
+            for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=4):
+                for c_idx, value in enumerate(row, start=1):
+                    cell = ws.cell(row=r_idx, column=c_idx)
+                    if cell.coordinate in ws.merged_cells:
+                        continue
+                    safe_value = "" if pd.isna(value) else str(value)
+                    cell.value = safe_value
+
+            with NamedTemporaryFile() as tmp:
+                wb.save(tmp.name)
+                tmp.seek(0)
+                zipf.writestr("CX_Ready_Manifest.xlsx", tmp.read())
 
     output.seek(0)
     st.download_button(

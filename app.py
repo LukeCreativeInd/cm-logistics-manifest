@@ -97,7 +97,10 @@ if uploaded_file and generate:
             buffer = BytesIO()
 
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                df.to_excel(writer, index=False, sheet_name='Manifest')
+                if "Phone No." in df.columns:
+    df["Phone No."] = df["Phone No."].astype(str).str.replace(r"\.0$", "", regex=True)
+
+df.to_excel(writer, index=False, sheet_name='Manifest')
 
                 # Set Phone No. column to text format in Excel
                 workbook = writer.book

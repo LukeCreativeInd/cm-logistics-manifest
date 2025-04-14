@@ -123,9 +123,6 @@ if uploaded_file and generate:
     # Build CX Ready Manifest
     if not cx_manifest.empty:
         from datetime import timedelta
-        cx_template = pd.read_excel("cx_manifest_template.xlsx", header=None, nrows=3)
-        cx_ready_header = cx_template
-
         cx_ready_body = pd.DataFrame({
             "INV NO.": cx_manifest["D.O. No."],
             "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
@@ -144,7 +141,6 @@ if uploaded_file and generate:
             "COMMENT": cx_manifest["Instructions"]
         })
         cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
-        cx_ready = pd.concat([cx_ready_header, cx_ready_body], ignore_index=True)
 
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
@@ -173,13 +169,22 @@ if uploaded_file and generate:
         if not cx_manifest.empty:
             cx_buffer = BytesIO()
             with pd.ExcelWriter(cx_buffer, engine='xlsxwriter') as writer:
-                cx_ready.to_excel(writer, index=False, header=False, sheet_name='Manifest')
                 workbook = writer.book
-                worksheet = writer.sheets['Manifest']
+                worksheet = workbook.add_worksheet('Manifest')
+                writer.sheets['Manifest'] = worksheet
+
+                # Load header from template
+                template_df = pd.read_excel("cx_manifest_template.xlsx", header=None, nrows=3)
+                for row_idx, row in template_df.iterrows():
+                    for col_idx, val in enumerate(row):
+                        worksheet.write(row_idx, col_idx, val)
+
+                # Write cx_ready_body below header (starting at row 3)
+                for r_idx, row in cx_ready_body.iterrows():
+                    for c_idx, val in enumerate(row):
+                        worksheet.write(r_idx + 3, c_idx, val)
+
                 worksheet.set_column('A:O', 20)
-                worksheet.write('B1', 'Clean Eats')
-                yellow_format = workbook.add_format({'bg_color': '#FFFF00'})
-                worksheet.write('B2', '<-- This must change for each manifest', yellow_format)
             zipf.writestr("CX_Ready_Manifest.xlsx", cx_buffer.getvalue())
 
     output.seek(0)

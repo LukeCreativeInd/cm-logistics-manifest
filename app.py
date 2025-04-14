@@ -123,29 +123,28 @@ if uploaded_file and generate:
     # Build CX Ready Manifest
     if not cx_manifest.empty:
         from datetime import timedelta
+        cx_template = pd.read_excel("CX Manifest Template.xlsx", header=None, nrows=3)
+        cx_ready_header = cx_template
 
-cx_template = pd.read_excel("CX Manifest Template.xlsx", header=None, nrows=3)
-cx_ready_header = cx_template
-
-cx_ready_body = pd.DataFrame({
-    "INV NO.": cx_manifest["D.O. No."],
-    "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
-    "STORE NO": "",
-    "STORE NAME": cx_manifest["Deliver to"],
-    "ADDRESS": cx_manifest["Address 1"],
-    "SUBURB": cx_manifest["Address 2"],
-    "STATE": cx_manifest["State"],
-    "POSTCODE": cx_manifest["Postal Code"],
-    "CARTONS": cx_manifest["No. of Shipping Labels"],
-    "PALLETS": "",
-    "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
-    "INV. VALUE": "",
-    "COD": "",
-    "TEMP": "chilled",
-    "COMMENT": cx_manifest["Instructions"]
-})
-cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
-cx_ready = pd.concat([cx_ready_header, cx_ready_body], ignore_index=True)
+        cx_ready_body = pd.DataFrame({
+            "INV NO.": cx_manifest["D.O. No."],
+            "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
+            "STORE NO": "",
+            "STORE NAME": cx_manifest["Deliver to"],
+            "ADDRESS": cx_manifest["Address 1"],
+            "SUBURB": cx_manifest["Address 2"],
+            "STATE": cx_manifest["State"],
+            "POSTCODE": cx_manifest["Postal Code"],
+            "CARTONS": cx_manifest["No. of Shipping Labels"],
+            "PALLETS": "",
+            "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
+            "INV. VALUE": "",
+            "COD": "",
+            "TEMP": "chilled",
+            "COMMENT": cx_manifest["Instructions"]
+        })
+        cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
+        cx_ready = pd.concat([cx_ready_header, cx_ready_body], ignore_index=True)
 
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:

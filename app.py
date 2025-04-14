@@ -163,7 +163,7 @@ if uploaded_file and generate:
                 "POSTCODE": cx_manifest["Postal Code"],
                 "CARTONS": cx_manifest["No. of Shipping Labels"],
                 "PALLETS": "",
-                "WEIGHT (KG)": cx_manifest["Line Items"].astype(float) * 0.4,
+                "WEIGHT (KG)": (cx_manifest["Line Items"].astype(float) * 0.4).round(2),
                 "INV. VALUE": "",
                 "COD": "",
                 "TEMP": "chilled",

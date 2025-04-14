@@ -123,7 +123,7 @@ if uploaded_file and generate:
     # Build CX Ready Manifest
     if not cx_manifest.empty:
         from datetime import timedelta
-        cx_template = pd.read_excel("CX Manifest Template.xlsx", header=None, nrows=3)
+        cx_template = pd.read_excel("cx_manifest_template.xlsx", header=None, nrows=3)
         cx_ready_header = cx_template
 
         cx_ready_body = pd.DataFrame({

@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import openpyxl
 import math
 import zipfile
 from io import BytesIO
@@ -123,6 +124,10 @@ if uploaded_file and generate:
     # Build CX Ready Manifest
     if not cx_manifest.empty:
         from datetime import timedelta
+        from openpyxl import load_workbook
+        from openpyxl.utils.dataframe import dataframe_to_rows
+
+        # Prepare the body
         cx_ready_body = pd.DataFrame({
             "INV NO.": cx_manifest["D.O. No."],
             "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
@@ -142,50 +147,19 @@ if uploaded_file and generate:
         })
         cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
 
-    output = BytesIO()
-    with zipfile.ZipFile(output, "w") as zipf:
-        def add_to_zip(df, filename):
-            if df.empty:
-                return
-            buffer = BytesIO()
-            with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-                if "Phone No." in df.columns:
-                    df["Phone No."] = df["Phone No."].astype(str).str.replace(r"\.0$", "", regex=True)
-                df.to_excel(writer, index=False, sheet_name='Manifest')
+        # Load template and write data
+        wb = load_workbook("cx_manifest_template.xlsx")
+        ws = wb.active
 
-                workbook = writer.book
-                worksheet = writer.sheets['Manifest']
-                text_fmt = workbook.add_format({'num_format': '@'})
-                if "Phone No." in df.columns:
-                    col_index = df.columns.get_loc("Phone No.")
-                    worksheet.set_column(col_index, col_index, None, text_fmt)
+        for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=4):
+            for c_idx, value in enumerate(row, start=1):
+                ws.cell(row=r_idx, column=c_idx, value=value)
 
-            zipf.writestr(filename, buffer.getvalue())
-
-        add_to_zip(cm_manifest, "CM_Manifest.xlsx")
-        add_to_zip(mc_manifest, "MC_Manifest.xlsx")
-        add_to_zip(cx_manifest, "CX_Manifest.xlsx")
-        add_to_zip(other_manifest, "Other_Manifest.xlsx")
-        if not cx_manifest.empty:
-            cx_buffer = BytesIO()
-            with pd.ExcelWriter(cx_buffer, engine='xlsxwriter') as writer:
-                workbook = writer.book
-                worksheet = workbook.add_worksheet('Manifest')
-                writer.sheets['Manifest'] = worksheet
-
-                # Load header from template
-                template_df = pd.read_excel("cx_manifest_template.xlsx", header=None, nrows=3)
-                for row_idx, row in template_df.iterrows():
-                    for col_idx, val in enumerate(row):
-                        worksheet.write(row_idx, col_idx, str(val) if not pd.isna(val) else "")
-
-                # Write cx_ready_body below header (starting at row 3)
-                for r_idx, row in cx_ready_body.iterrows():
-                    for c_idx, val in enumerate(row):
-                        worksheet.write(r_idx + 3, c_idx, val)
-
-                worksheet.set_column('A:O', 20)
-            zipf.writestr("CX_Ready_Manifest.xlsx", cx_buffer.getvalue())
+        from tempfile import NamedTemporaryFile
+        with NamedTemporaryFile() as tmp:
+            wb.save(tmp.name)
+            tmp.seek(0)
+            zipf.writestr("CX_Ready_Manifest.xlsx", tmp.read())
 
     output.seek(0)
     st.download_button(

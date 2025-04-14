@@ -89,10 +89,12 @@ if uploaded_file and generate:
 
     cm_names = orders_df[orders_df["Tags"].str.contains("CM")]["Name"].unique()
     mc_names = orders_df[orders_df["Tags"].str.contains("MC")]["Name"].unique()
-    all_tagged_names = set(cm_names) | set(mc_names)
+    cx_names = orders_df[orders_df["Tags"].str.contains("CX")]["Name"].unique()
+    all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]
     mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
+    cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
     # Add Cold Express row if selected
@@ -139,6 +141,7 @@ if uploaded_file and generate:
 
         add_to_zip(cm_manifest, "CM_Manifest.xlsx")
         add_to_zip(mc_manifest, "MC_Manifest.xlsx")
+        add_to_zip(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip(other_manifest, "Other_Manifest.xlsx")
 
     output.seek(0)

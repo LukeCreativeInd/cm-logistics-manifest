@@ -126,6 +126,7 @@ if uploaded_file and generate:
 
 cx_template = pd.read_excel("CX Manifest Template.xlsx", header=None, nrows=3)
 cx_ready_header = cx_template
+
 cx_ready_body = pd.DataFrame({
     "INV NO.": cx_manifest["D.O. No."],
     "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),

@@ -64,7 +64,8 @@ if uploaded_file and generate:
             "VEGGIE LOVERS PACK",
             "Clean Eats Meal Plan"
         ]
-        total_qty = group[~group["Lineitem name"].isin(bundle_items)]["Lineitem quantity"].sum()
+        non_bundle_items = group[~group["Lineitem name"].isin(bundle_items)]
+        total_qty = non_bundle_items["Lineitem quantity"].sum()
         labels = math.ceil(total_qty / 20)
 
         phone = order.get("Billing Phone", "")

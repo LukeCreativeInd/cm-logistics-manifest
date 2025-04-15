@@ -51,10 +51,20 @@ if uploaded_file and generate:
 
     for name, group in grouped_orders:
         order = group.iloc[0]
-        total_qty = group["Lineitem quantity"].sum()
-        is_bundle = "Bundle" in order["Tags"]
-        if is_bundle:
-            total_qty -= 1
+        bundle_items = [
+            "CARB LOVER'S FEAST",
+            "SUPER CHARGED CALORIES",
+            "FEED ME BEEF",
+            "GIVE ME CHICKEN",
+            "I WON'T PAS(TA) ON THIS MEAL",
+            "THE MEGA PACK",
+            "MAKE YOUR OWN MEGA PACK",
+            "CARB HATERS FEAST",
+            "UNDER CHARGED CALORIES",
+            "VEGGIE LOVERS PACK",
+            "Clean Eats Meal Plan"
+        ]
+        total_qty = group[~group["Lineitem name"].isin(bundle_items)]["Lineitem quantity"].sum()
         labels = math.ceil(total_qty / 20)
 
         phone = order.get("Billing Phone", "")

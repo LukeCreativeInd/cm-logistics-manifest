@@ -64,8 +64,28 @@ if uploaded_file and generate:
             "VEGGIE LOVERS PACK",
             "Clean Eats Meal Plan"
         ]
-        non_bundle_items = group[~group["Lineitem name"].isin(bundle_items)]
-        total_qty = non_bundle_items["Lineitem quantity"].sum()
+
+        made_active_bundles = {
+            "10 Pack": 10,
+            "20 Pack": 20,
+            "30 Pack": 30,
+            "10 Meal Christmas Bundle": 10,
+            "14 Meal Christmas Bundle": 14,
+            "High Protein Pack": 12,
+            "The Bunny Bundle": 10
+        }
+        if group_option == "Clean Eats Australia":
+            non_bundle_items = group[~group["Lineitem name"].isin(bundle_items)]
+            total_qty = non_bundle_items["Lineitem quantity"].sum()
+        else:
+            total_qty = 0
+            for _, row in group.iterrows():
+                name = row["Lineitem name"]
+                qty = row["Lineitem quantity"]
+                if name in made_active_bundles:
+                    total_qty += made_active_bundles[name] * qty
+                else:
+                    total_qty += qty
         labels = math.ceil(total_qty / 20)
 
         phone = order.get("Billing Phone", "")

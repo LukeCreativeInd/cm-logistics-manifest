@@ -121,12 +121,9 @@ if uploaded_file and generate:
 
     manifest_df = pd.DataFrame(manifest_rows)
 
-    cm_names = manifest_df
-    cm_names = cm_names[cm_names["Tags"].str.contains("CM")]["D.O. No."].unique()
-    mc_names = manifest_df
-    mc_names = mc_names[mc_names["Tags"].str.contains("MC")]["D.O. No."].unique()
-    cx_names = manifest_df
-    cx_names = cx_names[cx_names["Tags"].str.contains("CX")]["D.O. No."].unique()
+    cm_names = orders_df[orders_df["Tags"].str.contains("CM")]["Name"].unique()
+    mc_names = orders_df[orders_df["Tags"].str.contains("MC")]["Name"].unique()
+    cx_names = orders_df[orders_df["Tags"].str.contains("CX")]["Name"].unique()
     all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]

@@ -47,10 +47,11 @@ if uploaded_file and generate:
     country_map = {"AU": "Australia"}
 
     manifest_rows = []
-    grouped_orders = orders_df.groupby("Name")
+    grouped_orders = orders_df.groupby("Name", sort=False)  # 'Name' is the order number
 
     for name, group in grouped_orders:
         order = group.iloc[0]
+        order_number = name
         bundle_items = [
             "CARB LOVER'S FEAST",
             "SUPER CHARGED CALORIES",
@@ -101,7 +102,7 @@ if uploaded_file and generate:
         delivery_date = date_match.group(1) if date_match else ""
 
         manifest_rows.append({
-            "D.O. No.": name,
+            "D.O. No.": order_number,
             "Date": delivery_date,
             "Address 1": order["Shipping Street"],
             "Address 2": order["Shipping City"],

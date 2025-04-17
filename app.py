@@ -76,6 +76,7 @@ if uploaded_file and generate:
             "The Bunny Bundle": 10
         }
         if group_option == "Clean Eats Australia":
+            group["Lineitem name"] = group["Lineitem name"].astype(str).str.strip()
             non_bundle_items = group[~group["Lineitem name"].isin(bundle_items)]
             total_qty = non_bundle_items["Lineitem quantity"].sum()
         else:

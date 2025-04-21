@@ -113,10 +113,10 @@ if uploaded_file and generate:
             "Deliver to": order["Shipping Name"],
             "Phone No.": phone,
             "Time Window": "0600-1800",
-            "City": city,
-            "Group": group_option,
+                        "Group": group_option,
             "No. of Shipping Labels": labels,
             "Line Items": total_qty,
+            "Email": order["Email"],
             "Instructions": order["Notes"]
         })
 

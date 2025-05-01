@@ -16,7 +16,7 @@ st.title("CM Logistics Manifest Generator")
 st.markdown("Upload your orders export CSV, choose the group, then click Generate to get your manifests.")
 
 # Group selector
-group_option = st.selectbox("Select Group Name:", ["Clean Eats Australia", "Made Active"])
+group_option = st.selectbox("Select Group Name:", ["Clean Eats Australia", "Made Active", "Elite Meals"])
 
 # Cold Express checkbox
 cold_required = st.checkbox("Is there a Cold Express Pickup Required?")
@@ -47,11 +47,12 @@ if uploaded_file and generate:
     country_map = {"AU": "Australia"}
 
     manifest_rows = []
-    grouped_orders = orders_df.groupby("Name", sort=False)  # 'Name' is the order number
+    grouped_orders = orders_df.groupby("Name", sort=False)
 
     for name, group in grouped_orders:
         order = group.iloc[0]
         order_number = name
+
         bundle_items = [
             "CARB LOVER'S FEAST",
             "SUPER CHARGED CALORIES",
@@ -75,11 +76,12 @@ if uploaded_file and generate:
             "High Protein Pack": 12,
             "The Bunny Bundle": 10
         }
+
         if group_option == "Clean Eats Australia":
             group["Lineitem name"] = group["Lineitem name"].astype(str).str.strip()
             non_bundle_items = group[~group["Lineitem name"].isin(bundle_items)]
             total_qty = non_bundle_items["Lineitem quantity"].sum()
-        else:
+        elif group_option == "Made Active":
             total_qty = 0
             for _, row in group.iterrows():
                 name = row["Lineitem name"]
@@ -88,6 +90,9 @@ if uploaded_file and generate:
                     total_qty += made_active_bundles[name] * qty
                 else:
                     total_qty += qty
+        else:  # Elite Meals
+            total_qty = group["Lineitem quantity"].sum()
+
         labels = math.ceil(total_qty / 20)
 
         phone = order.get("Billing Phone", "")
@@ -113,7 +118,7 @@ if uploaded_file and generate:
             "Deliver to": order["Shipping Name"],
             "Phone No.": phone,
             "Time Window": "0600-1800",
-                        "Group": group_option,
+            "Group": group_option,
             "No. of Shipping Labels": labels,
             "Line Items": total_qty,
             "Email": order["Email"],
@@ -128,11 +133,10 @@ if uploaded_file and generate:
     all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]
-    mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
+    mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names) | (manifest_df["Group"] == "Elite Meals")]
     cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
-    # Add Cold Express row if selected
     if cold_required:
         total_cartons = int(cx_manifest["No. of Shipping Labels"].sum()) if not cx_manifest.empty else ""
         today_str = datetime.now().strftime("%d/%m/%Y")
@@ -155,7 +159,6 @@ if uploaded_file and generate:
         }
         mc_manifest = pd.concat([mc_manifest, pd.DataFrame([cold_row])], ignore_index=True)
 
-    # Build CX Ready Manifest
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
         def add_to_zip(df, filename):
@@ -178,47 +181,6 @@ if uploaded_file and generate:
         add_to_zip(mc_manifest, "MC_Manifest.xlsx")
         add_to_zip(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip(other_manifest, "Other_Manifest.xlsx")
-
-        if not cx_manifest.empty:
-            from datetime import timedelta
-            from openpyxl import load_workbook
-            from openpyxl.utils.dataframe import dataframe_to_rows
-            from tempfile import NamedTemporaryFile
-
-            cx_ready_body = pd.DataFrame({
-                "INV NO.": cx_manifest["D.O. No."],
-                "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
-                "STORE NO": "",
-                "STORE NAME": cx_manifest["Deliver to"],
-                "ADDRESS": cx_manifest["Address 1"],
-                "SUBURB": cx_manifest["Address 2"],
-                "STATE": cx_manifest["State"],
-                "POSTCODE": cx_manifest["Postal Code"],
-                "CARTONS": cx_manifest["No. of Shipping Labels"],
-                "PALLETS": "",
-                "WEIGHT (KG)": (cx_manifest["Line Items"].astype(float) * 0.4).round(2),
-                "INV. VALUE": "",
-                "COD": "",
-                "TEMP": "chilled",
-                "COMMENT": cx_manifest["Instructions"]
-            })
-            cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
-
-            wb = load_workbook("cx_manifest_template.xlsx")
-            ws = wb.active
-
-            for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=6):
-                for c_idx, value in enumerate(row, start=1):
-                    cell = ws.cell(row=r_idx, column=c_idx)
-                    if cell.coordinate in ws.merged_cells:
-                        continue
-                    safe_value = "" if pd.isna(value) else str(value)
-                    cell.value = safe_value
-
-            with NamedTemporaryFile() as tmp:
-                wb.save(tmp.name)
-                tmp.seek(0)
-                zipf.writestr("CX_Ready_Manifest.xlsx", tmp.read())
 
     output.seek(0)
     st.download_button(

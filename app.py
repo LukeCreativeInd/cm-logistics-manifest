@@ -77,17 +77,30 @@ if uploaded_file and generate:
             "The Bunny Bundle": 10
         }
 
+        family_double_items = [
+            "Family Mac and 3 Cheese Pasta Bake",
+            "Baked Family Lasagna"
+        ]
+
         if group_option == "Clean Eats Australia":
             group["Lineitem name"] = group["Lineitem name"].astype(str).str.strip()
-            non_bundle_items = group[~group["Lineitem name"].isin(bundle_items)]
-            total_qty = non_bundle_items["Lineitem quantity"].sum()
+            total_qty = 0
+            for _, row in group.iterrows():
+                item_name = row["Lineitem name"]
+                item_qty = row["Lineitem quantity"]
+                if item_name in bundle_items:
+                    continue  # exclude bundles entirely
+                elif item_name in family_double_items:
+                    total_qty += item_qty * 2  # double count
+                else:
+                    total_qty += item_qty
         elif group_option == "Made Active":
             total_qty = 0
             for _, row in group.iterrows():
-                name = row["Lineitem name"]
+                item_name = row["Lineitem name"]
                 qty = row["Lineitem quantity"]
-                if name in made_active_bundles:
-                    total_qty += made_active_bundles[name] * qty
+                if item_name in made_active_bundles:
+                    total_qty += made_active_bundles[item_name] * qty
                 else:
                     total_qty += qty
         else:  # Elite Meals

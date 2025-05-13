@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 
-def run_made_active():
+def run():
     st.markdown("### Made Active Manifest Generator")
 
     uploaded_file = st.file_uploader("Upload Made Active orders_export CSV file", type="csv")

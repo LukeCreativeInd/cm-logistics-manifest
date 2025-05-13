@@ -99,4 +99,4 @@ def run():
             "Instructions": order["Notes"]
         })
 
-    manifest_df = pd.DataFrame(manifest_rows
+    manifest_df = pd.DataFrame(manifest_rows)

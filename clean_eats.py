@@ -10,7 +10,7 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from tempfile import NamedTemporaryFile
 
 
-def run_clean_eats():
+def run():
     st.markdown("### Clean Eats Manifest Generator")
 
     cold_required = st.checkbox("Is there a Cold Express Pickup Required?")

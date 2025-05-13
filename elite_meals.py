@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 
 
-def run_elite_meals():
+def run():
     st.markdown("### Elite Meals Manifest Generator")
 
     uploaded_file = st.file_uploader("Upload Elite Meals orders_export CSV file", type="csv")

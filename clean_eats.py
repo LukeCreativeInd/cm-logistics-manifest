@@ -61,9 +61,8 @@ def run():
                 item = row["Lineitem name"].strip()
                 qty = row["Lineitem quantity"]
 
-                # ✅ Updated bundle match to allow partial matches
+                # ✅ Correct logic: ignore bundle lines, don't subtract
                 if any(bundle in item for bundle in bundle_items):
-                    total_qty -= qty
                     continue
                 elif item in family_double_items:
                     total_qty += qty * 2

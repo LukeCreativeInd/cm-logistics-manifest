@@ -60,8 +60,10 @@ def run():
             for _, row in group.iterrows():
                 item = row["Lineitem name"].strip()
                 qty = row["Lineitem quantity"]
-                if item in bundle_items:
-                    total_qty -= qty  # fix: subtract bundle quantity explicitly
+
+                # ✅ Updated bundle match to allow partial matches
+                if any(bundle in item for bundle in bundle_items):
+                    total_qty -= qty
                     continue
                 elif item in family_double_items:
                     total_qty += qty * 2

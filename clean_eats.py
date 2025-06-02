@@ -68,8 +68,8 @@ def run():
                     total_qty += qty * 2
                 else:
                     total_qty += qty
-
-            labels = math.ceil(total_qty / 20)
+ 
+            labels = math.ceil(total_qty / 24)
             phone = order.get("Billing Phone") or order.get("Phone")
             phone = format_phone(phone)
 

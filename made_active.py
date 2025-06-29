@@ -4,8 +4,9 @@ import math
 import zipfile
 from io import BytesIO
 import re
-from datetime import datetime
-
+from datetime import datetime, timedelta
+from openpyxl import Workbook
+from tempfile import NamedTemporaryFile
 
 def run():
     st.markdown("### Made Active Manifest Generator")
@@ -58,7 +59,11 @@ def run():
         phone = order.get("Billing Phone") or order.get("Phone")
         phone = format_phone(phone)
 
-        state_map = {"VIC": "Victoria", "NSW": "New South Wales"}
+        state_map = {
+            "VIC": "Victoria",
+            "NSW": "New South Wales",
+            "ACT": "Australian Capital Territory"
+        }
         country_map = {"AU": "Australia"}
         state = state_map.get(order["Shipping Province"], order["Shipping Province"])
         country = country_map.get(order["Shipping Country"], order["Shipping Country"])
@@ -96,6 +101,10 @@ def run():
     cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
+    # --- Polar Parcel Manifest Logic ---
+    polar_states = ["New South Wales", "Australian Capital Territory"]
+    polar_df = manifest_df[manifest_df["State"].isin(polar_states)]
+
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
         def add_to_zip(df, filename):
@@ -116,6 +125,51 @@ def run():
         add_to_zip(mc_manifest, "MC_Manifest.xlsx")
         add_to_zip(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip(other_manifest, "Other_Manifest.xlsx")
+
+        # --- Polar Parcel Manifest Generation ---
+        if not polar_df.empty:
+            polar_orders = []
+            for _, row in polar_df.iterrows():
+                polar_orders.append([
+                    "Made Active",             # Seller Name
+                    row["D.O. No."],          # Order No.
+                    row["Deliver to"],        # Customer Name
+                    row["Address 1"],         # Address
+                    row["Address 2"],         # City
+                    row["Postal Code"],       # Postcode
+                    str(row["Phone No."]) if row["Phone No."] else "",  # Phone as text
+                    row["Email"],             # Email
+                    row["Instructions"],      # Delivery Notes
+                    row["No. of Shipping Labels"]  # Cartons
+                ])
+
+            wb = Workbook()
+            ws = wb.active
+
+            # Row 1: "Delivery Date" (A1), <date + 2 days> (B1)
+            ws["A1"] = "Delivery Date"
+            delivery_date = (datetime.now() + timedelta(days=2)).strftime("%d/%m/%Y")
+            ws["B1"] = delivery_date
+
+            # Row 2: Headers (A2:J2)
+            headers = [
+                "Seller Name", "Order No.", "Customer Name", "Address", "City",
+                "Postcode", "Phone", "Email", "Delivery Notes", "Cartons"
+            ]
+            for col_num, header in enumerate(headers, 1):
+                ws.cell(row=2, column=col_num, value=header)
+
+            # Order data (Row 3 down), with phone as text
+            for row_idx, order in enumerate(polar_orders, start=3):
+                for col_idx, value in enumerate(order, start=1):
+                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                    if col_idx == 7:  # Phone column
+                        cell.number_format = '@'
+
+            with NamedTemporaryFile() as tmp:
+                wb.save(tmp.name)
+                tmp.seek(0)
+                zipf.writestr("Polar_Parcel_Manifest.xlsx", tmp.read())
 
     output.seek(0)
     st.download_button(

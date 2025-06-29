@@ -196,7 +196,6 @@ def run():
 
             # --- Polar Parcel Manifest Generation ---
             if not polar_df.empty:
-                # Prepare order data in Polar Parcel format
                 polar_orders = []
                 for _, row in polar_df.iterrows():
                     polar_orders.append([
@@ -206,7 +205,7 @@ def run():
                         row["Address 1"],       # Address
                         row["Address 2"],       # City
                         row["Postal Code"],     # Postcode
-                        row["Phone No."],       # Phone
+                        str(row["Phone No."]) if row["Phone No."] else "",  # Phone as string!
                         row["Email"],           # Email
                         row["Instructions"],    # Delivery Notes
                         row["No. of Shipping Labels"]  # Cartons
@@ -228,10 +227,12 @@ def run():
                 for col_num, header in enumerate(headers, 1):
                     ws.cell(row=2, column=col_num, value=header)
 
-                # Order data (Row 3 down)
+                # Order data (Row 3 down) - phone number as text
                 for row_idx, order in enumerate(polar_orders, start=3):
                     for col_idx, value in enumerate(order, start=1):
-                        ws.cell(row=row_idx, column=col_idx, value=value)
+                        cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                        if col_idx == 7:  # Phone column
+                            cell.number_format = '@'
 
                 with NamedTemporaryFile() as tmp:
                     wb.save(tmp.name)

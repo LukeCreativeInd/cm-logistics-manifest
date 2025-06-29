@@ -5,6 +5,7 @@ import zipfile
 from io import BytesIO
 import re
 from datetime import datetime, timedelta
+from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from tempfile import NamedTemporaryFile
@@ -60,20 +61,21 @@ def run():
             for _, row in group.iterrows():
                 item = row["Lineitem name"].strip()
                 qty = row["Lineitem quantity"]
-
-                # ✅ Correct logic: ignore bundle lines, don't subtract
                 if any(bundle in item for bundle in bundle_items):
                     continue
                 elif item in family_double_items:
                     total_qty += qty * 2
                 else:
                     total_qty += qty
- 
             labels = math.ceil(total_qty / 24)
             phone = order.get("Billing Phone") or order.get("Phone")
             phone = format_phone(phone)
 
-            state_map = {"VIC": "Victoria", "NSW": "New South Wales"}
+            state_map = {
+                "VIC": "Victoria",
+                "NSW": "New South Wales",
+                "ACT": "Australian Capital Territory"
+            }
             country_map = {"AU": "Australia"}
             state = state_map.get(order["Shipping Province"], order["Shipping Province"])
             country = country_map.get(order["Shipping Country"], order["Shipping Country"])
@@ -133,6 +135,10 @@ def run():
             }
             mc_manifest = pd.concat([mc_manifest, pd.DataFrame([cold_row])], ignore_index=True)
 
+        # --- Polar Parcel Manifest Logic ---
+        polar_states = ["New South Wales", "Australian Capital Territory"]
+        polar_df = manifest_df[manifest_df["State"].isin(polar_states)]
+
         output = BytesIO()
         with zipfile.ZipFile(output, "w") as zipf:
             def add_to_zip(df, filename):
@@ -187,6 +193,50 @@ def run():
                     wb.save(tmp.name)
                     tmp.seek(0)
                     zipf.writestr("CX_Ready_Manifest.xlsx", tmp.read())
+
+            # --- Polar Parcel Manifest Generation ---
+            if not polar_df.empty:
+                # Prepare order data in Polar Parcel format
+                polar_orders = []
+                for _, row in polar_df.iterrows():
+                    polar_orders.append([
+                        "Clean Eats Australia",  # Seller Name
+                        row["D.O. No."],        # Order No.
+                        row["Deliver to"],      # Customer Name
+                        row["Address 1"],       # Address
+                        row["Address 2"],       # City
+                        row["Postal Code"],     # Postcode
+                        row["Phone No."],       # Phone
+                        row["Email"],           # Email
+                        row["Instructions"],    # Delivery Notes
+                        row["No. of Shipping Labels"]  # Cartons
+                    ])
+
+                wb = Workbook()
+                ws = wb.active
+
+                # Row 1: "Delivery Date" (A1), <date + 2 days> (B1)
+                ws["A1"] = "Delivery Date"
+                delivery_date = (datetime.now() + timedelta(days=2)).strftime("%d/%m/%Y")
+                ws["B1"] = delivery_date
+
+                # Row 2: Headers (A2:K2)
+                headers = [
+                    "Seller Name", "Order No.", "Customer Name", "Address", "City",
+                    "Postcode", "Phone", "Email", "Delivery Notes", "Cartons"
+                ]
+                for col_num, header in enumerate(headers, 1):
+                    ws.cell(row=2, column=col_num, value=header)
+
+                # Order data (Row 3 down)
+                for row_idx, order in enumerate(polar_orders, start=3):
+                    for col_idx, value in enumerate(order, start=1):
+                        ws.cell(row=row_idx, column=col_idx, value=value)
+
+                with NamedTemporaryFile() as tmp:
+                    wb.save(tmp.name)
+                    tmp.seek(0)
+                    zipf.writestr("Polar_Parcel_Manifest.xlsx", tmp.read())
 
         output.seek(0)
         st.download_button(

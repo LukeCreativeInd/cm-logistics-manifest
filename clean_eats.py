@@ -84,7 +84,8 @@ def run():
             delivery_date = date_match.group(1) if date_match else ""
 
             shipping_name = order["Shipping Name"].strip()
-            shipping_company = str(order.get("Shipping Company", "")).strip()
+            shipping_company = order.get("Shipping Company", "")
+            shipping_company = "" if pd.isna(shipping_company) else str(shipping_company).strip()
             company_value = shipping_company if shipping_company and shipping_company.lower() != shipping_name.lower() else ""
 
             manifest_rows.append({

@@ -11,12 +11,12 @@ from tempfile import NamedTemporaryFile
 def run():
     st.markdown("### Made Active Manifest Generator")
 
-    uploaded_file = st.file_uploader("Upload Made Active orders_export CSV file", type="csv")
+    uploaded_files = st.file_uploader("Upload one or more Made Active CSV exports", type="csv", accept_multiple_files=True)
 
-    if not uploaded_file:
+    if not uploaded_files:
         return
 
-    orders_df = pd.read_csv(uploaded_file)
+    orders_df = pd.concat([pd.read_csv(f) for f in uploaded_files], ignore_index=True)
     orders_df.columns = orders_df.columns.str.strip()
     orders_df["Notes"] = orders_df["Notes"].fillna("")
     orders_df["Tags"] = orders_df["Tags"].fillna("")
@@ -80,7 +80,6 @@ def run():
             "State": state,
             "Country": country,
             "Deliver to": order["Shipping Name"],
-                "Company": order.get("Shipping Company", ""),
             "Phone No.": phone,
             "Time Window": "0600-1800",
             "Group": "Made Active",

@@ -14,12 +14,12 @@ def run():
     st.markdown("### Clean Eats Manifest Generator")
 
     cold_required = st.checkbox("Is there a Cold Express Pickup Required?")
-    uploaded_file = st.file_uploader("Upload Clean Eats orders_export CSV file", type="csv")
+    uploaded_files = st.file_uploader("Upload one or more Clean Eats CSV exports", type="csv", accept_multiple_files=True)
     generate = st.button("Generate Clean Eats Manifests")
 
-    if uploaded_file and generate:
-        orders_df = pd.read_csv(uploaded_file)
-        orders_df.columns = orders_df.columns.str.strip()
+    if uploaded_files and generate:
+        orders_df = pd.concat([pd.read_csv(f) for f in uploaded_files], ignore_index=True)
+                orders_df.columns = orders_df.columns.str.strip()
         orders_df["Notes"] = orders_df["Notes"].fillna("")
         orders_df["Tags"] = orders_df["Tags"].fillna("")
 
@@ -83,6 +83,11 @@ def run():
             date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", order["Tags"])
             delivery_date = date_match.group(1) if date_match else ""
 
+            
+            shipping_name = order["Shipping Name"].strip()
+            shipping_company = str(order.get("Shipping Company", "")).strip()
+            company_value = shipping_company if shipping_company and shipping_company.lower() != shipping_name.lower() else ""
+
             manifest_rows.append({
                 "D.O. No.": name,
                 "Date": delivery_date,
@@ -91,8 +96,8 @@ def run():
                 "Postal Code": str(order["Shipping Zip"]).replace("'", ""),
                 "State": state,
                 "Country": country,
-                "Deliver to": order["Shipping Name"],
-                "Company": order.get("Shipping Company", ""),
+                "Deliver to": shipping_name,
+                "Company": company_value,
                 "Phone No.": phone,
                 "Time Window": "0600-1800",
                 "Group": "Clean Eats Australia",

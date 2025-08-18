@@ -57,6 +57,7 @@ def run():
             "State": state,
             "Country": country,
             "Deliver to": order["Shipping Name"],
+                "Company": order.get("Shipping Company", ""),
             "Phone No.": phone,
             "Time Window": "0600-1800",
             "Group": "Elite Meals",

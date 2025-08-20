@@ -83,6 +83,22 @@ def run():
             date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", order["Tags"])
             delivery_date = date_match.group(1) if date_match else ""
 
+            
+            shipping_name = order["Shipping Name"].strip()
+            shipping_company = order.get("Shipping Company", "")
+            shipping_company = "" if pd.isna(shipping_company) else str(shipping_company).strip()
+
+            if shipping_company:
+                if shipping_company.lower() == shipping_name.lower():
+                    deliver_to_value = ""
+                    company_value = shipping_company
+                else:
+                    deliver_to_value = shipping_name
+                    company_value = shipping_company
+            else:
+                deliver_to_value = shipping_name
+                company_value = ""
+
             manifest_rows.append({
                 "D.O. No.": name,
                 "Date": delivery_date,
@@ -91,7 +107,8 @@ def run():
                 "Postal Code": str(order["Shipping Zip"]).replace("'", ""),
                 "State": state,
                 "Country": country,
-                "Deliver to": order["Shipping Name"],
+                "Deliver to": deliver_to_value,
+                "Company": company_value,
                 "Phone No.": phone,
                 "Time Window": "0600-1800",
                 "Group": "Clean Eats Australia",

@@ -129,6 +129,11 @@ def run():
         mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
         cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
         other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
+        # Clean up MC manifest: restore Deliver to from original orders and remove Company column
+        original_names = orders_df.set_index("Name")["Shipping Name"].to_dict()
+        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(original_names).fillna("")
+        mc_manifest = mc_manifest.drop(columns=["Company"], errors="ignore")
+
 
         if cold_required:
             total_cartons = int(cx_manifest["No. of Shipping Labels"].sum()) if not cx_manifest.empty else ""

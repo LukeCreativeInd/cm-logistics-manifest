@@ -112,18 +112,22 @@ def run():
         mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
         cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
         other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
-        # For MC manifest: use Shipping Company as Deliver to, fallback to Shipping Name
+        # For MC manifest: use Shipping Company as Deliver to, fallback to Shipping Name (group-aware)
         orders_df["Name"] = orders_df["Name"].astype(str).str.strip()
         mc_manifest["D.O. No."] = mc_manifest["D.O. No."].astype(str).str.strip()
 
-        fallback_names = (
-            orders_df[["Name", "Shipping Company", "Shipping Name"]]
-            .astype(str)
-            .apply(lambda row: row["Shipping Company"].strip() if row["Shipping Company"].strip().lower() != "nan" and row["Shipping Company"].strip() != "" else row["Shipping Name"].strip(), axis=1)
-        )
-        fallback_dict = dict(zip(orders_df["Name"], fallback_names))
+        def get_valid_company_or_name(group):
+            company = group["Shipping Company"].dropna().astype(str).str.strip()
+            name = group["Shipping Name"].dropna().astype(str).str.strip()
+            if not company.empty and company.iloc[0].lower() != "nan" and company.iloc[0] != "":
+                return company.iloc[0]
+            elif not name.empty:
+                return name.iloc[0]
+            else:
+                return ""
 
-        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(fallback_dict).fillna("")
+        fallback_dict_grouped = orders_df.groupby("Name").apply(get_valid_company_or_name).to_dict()
+        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(fallback_dict_grouped).fillna("")
         mc_manifest = mc_manifest.drop(columns=["Company"], errors="ignore")
 
 

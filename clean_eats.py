@@ -115,8 +115,8 @@ def run():
         # For MC manifest: use Shipping Company as Deliver to, and drop Company column
         orders_df["Name"] = orders_df["Name"].astype(str).str.strip()
         mc_manifest["D.O. No."] = mc_manifest["D.O. No."].astype(str).str.strip()
-        shipping_companies = orders_df.set_index("Name")["Shipping Company"].astype(str).str.strip().replace("nan", "")
-        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(shipping_companies).fillna("")
+        shipping_companies_dict = orders_df.set_index("Name")["Shipping Company"].astype(str).str.strip().replace("nan", "").to_dict()
+        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(shipping_companies_dict).fillna("")
         mc_manifest = mc_manifest.drop(columns=["Company"], errors="ignore")
 
 

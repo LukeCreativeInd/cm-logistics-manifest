@@ -112,11 +112,18 @@ def run():
         mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
         cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
         other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
-        # For MC manifest: use Shipping Company as Deliver to, and drop Company column
+        # For MC manifest: use Shipping Company as Deliver to, fallback to Shipping Name
         orders_df["Name"] = orders_df["Name"].astype(str).str.strip()
         mc_manifest["D.O. No."] = mc_manifest["D.O. No."].astype(str).str.strip()
-        shipping_companies_dict = orders_df.set_index("Name")["Shipping Company"].astype(str).str.strip().replace("nan", "").to_dict()
-        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(shipping_companies_dict).fillna("")
+
+        fallback_names = (
+            orders_df[["Name", "Shipping Company", "Shipping Name"]]
+            .astype(str)
+            .apply(lambda row: row["Shipping Company"].strip() if row["Shipping Company"].strip().lower() != "nan" and row["Shipping Company"].strip() != "" else row["Shipping Name"].strip(), axis=1)
+        )
+        fallback_dict = dict(zip(orders_df["Name"], fallback_names))
+
+        mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(fallback_dict).fillna("")
         mc_manifest = mc_manifest.drop(columns=["Company"], errors="ignore")
 
 

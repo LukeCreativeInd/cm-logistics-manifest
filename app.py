@@ -3,7 +3,7 @@ import streamlit as st
 st.set_page_config(page_title="CM Logistics Manifest Generator", layout="centered")
 
 # Display logo (optional)
-st.image("CM_Logistics_Top_Logo.png", use_container_width=True)
+st.image("CM_Logistics_Top_Logo.png", width="stretch")
 
 st.title("CM Logistics Manifest Generator")
 st.markdown("### Which customer group do you want to create a manifest for?")

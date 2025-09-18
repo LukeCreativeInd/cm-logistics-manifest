@@ -37,7 +37,7 @@ def run():
         total_qty = group["Lineitem quantity"].sum()
         labels = math.ceil(total_qty / 20)
 
-        phone = order.get("Billing Phone") or order.get("Phone")
+        phone = order.get("Billing Phone") or order.get("Shipping Phone")
         phone = format_phone(phone)
 
         state_map = {"VIC": "Victoria", "NSW": "New South Wales"}

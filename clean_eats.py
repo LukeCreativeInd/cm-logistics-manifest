@@ -68,7 +68,7 @@ def run():
                 else:
                     total_qty += qty
             labels = math.ceil(total_qty / 24)
-            phone = order.get("Billing Phone") or order.get("Shipping Phone")
+            phone = order.get("Shipping Phone")
             phone = format_phone(phone)
 
             state_map = {

@@ -180,8 +180,10 @@ def run():
                 order_name_clean = to_clean_str(order_name)
                 mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
 
+                # Location = Shipping Company if present, else Shipping Name
                 ship_company = clean_cell(group["Shipping Company"].iloc[0]) if len(group) else ""
-                location = ship_company
+                ship_name = clean_cell(group["Shipping Name"].iloc[0]) if len(group) else ""
+                location = ship_company if ship_company else ship_name
 
                 email_vals = [clean_cell(x) for x in group["Email"].unique() if clean_cell(x)]
                 email = email_vals[0] if email_vals else ""

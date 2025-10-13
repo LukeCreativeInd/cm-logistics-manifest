@@ -254,8 +254,10 @@ def run():
                 tags_blob = " ".join(map(clean_cell, group["Tags"].unique()))
                 delivery_type = "Commercial" if "CEW" in tags_blob else "Residential"
 
+                # Location = Shipping Company if present, else Shipping Name
                 ship_company = clean_cell(group["Shipping Company"].iloc[0]) if len(group) else ""
-                location = ship_company  # blank if empty
+                ship_name = clean_cell(group["Shipping Name"].iloc[0]) if len(group) else ""
+                location = ship_company if ship_company else ship_name
 
                 email_vals = [clean_cell(x) for x in group["Email"].unique() if clean_cell(x)]
                 email = email_vals[0] if email_vals else ""

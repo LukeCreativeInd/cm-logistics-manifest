@@ -6,6 +6,43 @@ from io import BytesIO
 import re
 from datetime import datetime, timedelta
 
+NAN_LIKE = {"nan", "none", "null", ""}
+
+def clean_cell(x: object) -> str:
+    if x is None or (isinstance(x, float) and pd.isna(x)):
+        return ""
+    s = str(x).strip()
+    return "" if s.lower() in NAN_LIKE else s
+
+def to_clean_str(val: object) -> str:
+    s = clean_cell(val)
+    if s.startswith("'"):
+        s = s[1:]
+    if re.fullmatch(r"\d+\.0", s):
+        s = s[:-2]
+    return s
+
+def to_intish_str(val: object) -> str:
+    s = to_clean_str(val)
+    if re.fullmatch(r"\d+(\.\d+)?", s):
+        try:
+            f = float(s)
+            if f.is_integer():
+                return str(int(f))
+        except:
+            pass
+    return s
+
+def format_phone(phone: object) -> str:
+    p = clean_cell(phone).replace(" ", "").replace("+", "")
+    if not p:
+        return ""
+    if p.startswith("61"):
+        p = "0" + p[2:]
+    elif p.startswith("4"):
+        p = "0" + p
+    return p
+
 def run():
     st.markdown("### Made Active Manifest Generator")
 
@@ -13,15 +50,18 @@ def run():
     if not uploaded_file:
         return
 
-    orders_df = pd.read_csv(uploaded_file, dtype=str)
+    orders_df = pd.read_csv(uploaded_file, dtype=str, keep_default_na=False)
+    orders_df = orders_df.applymap(clean_cell)
     orders_df.columns = orders_df.columns.str.strip()
-    for col in ["Notes","Tags","Shipping Phone","Shipping Street","Shipping City","Shipping Zip",
-                "Shipping Province","Shipping Country","Shipping Name","Shipping Company","Email","Name",
-                "Lineitem name","Lineitem quantity"]:
-        if col in orders_df.columns:
-            orders_df[col] = orders_df[col].astype(str)
-    orders_df["Notes"] = orders_df["Notes"].fillna("")
-    orders_df["Tags"] = orders_df["Tags"].fillna("")
+
+    expected_cols = [
+        "Notes","Tags","Shipping Phone","Shipping Street","Shipping City","Shipping Zip",
+        "Shipping Province","Shipping Country","Shipping Name","Shipping Company","Email",
+        "Name","Lineitem name","Lineitem quantity"
+    ]
+    for c in expected_cols:
+        if c not in orders_df.columns:
+            orders_df[c] = ""
 
     bundle_map = {
         "10 Pack": 10,
@@ -33,45 +73,13 @@ def run():
         "The Bunny Bundle": 10
     }
 
-    def format_phone(phone):
-        if not phone or phone.lower() in ["nan", "none"]:
-            return ""
-        phone = str(phone).strip().replace(" ", "").replace("+", "")
-        if phone.startswith("61"):
-            phone = "0" + phone[2:]
-        elif phone.startswith("4"):
-            phone = "0" + phone
-        return phone
-
-    def to_clean_str(val):
-        s = "" if pd.isna(val) or str(val).lower() in ["nan","none"] else str(val)
-        s = s.strip()
-        if s.startswith("'"):
-            s = s[1:]
-        if re.fullmatch(r"\d+\.0", s):
-            s = s[:-2]
-        return s
-
-    def to_intish_str(val):
-        s = to_clean_str(val)
-        if re.fullmatch(r"\d+(\.\d+)?", s):
-            try:
-                f = float(s)
-                if f.is_integer():
-                    return str(int(f))
-            except:
-                pass
-        return s
-
     manifest_rows = []
-    grouped_orders = orders_df.groupby("Name", sort=False)
-
-    for name, group in grouped_orders:
+    for name, group in orders_df.groupby("Name", sort=False):
         order = group.iloc[0]
         total_qty = 0
         for _, row in group.iterrows():
-            item = str(row.get("Lineitem name","")).strip()
-            qty_raw = row.get("Lineitem quantity","0")
+            item = clean_cell(row.get("Lineitem name", ""))
+            qty_raw = clean_cell(row.get("Lineitem quantity", "0"))
             try:
                 qty = int(float(qty_raw))
             except:
@@ -83,42 +91,39 @@ def run():
                 total_qty += qty
 
         labels = math.ceil(total_qty / 20) if total_qty else 0
-        phone = format_phone(order.get("Shipping Phone",""))
 
-        state_map = {
-            "VIC": "Victoria",
-            "NSW": "New South Wales",
-            "ACT": "Australian Capital Territory"
-        }
+        state_map = {"VIC": "Victoria", "NSW": "New South Wales", "ACT": "Australian Capital Territory"}
         country_map = {"AU": "Australia"}
-        state = state_map.get(order.get("Shipping Province",""), order.get("Shipping Province",""))
-        country = country_map.get(order.get("Shipping Country",""), order.get("Shipping Country",""))
+        raw_state = clean_cell(order["Shipping Province"])
+        raw_country = clean_cell(order["Shipping Country"])
+        state = state_map.get(raw_state, raw_state)
+        country = country_map.get(raw_country, raw_country)
 
-        date_match = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", order.get("Tags",""))
-        delivery_date = date_match.group(1) if date_match else ""
+        tags_blob = clean_cell(order["Tags"])
+        m = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", tags_blob)
+        delivery_date = m.group(1) if m else ""
 
         manifest_rows.append({
             "D.O. No.": to_clean_str(name),
             "Date": delivery_date,
-            "Address 1": order.get("Shipping Street",""),
-            "Address 2": order.get("Shipping City",""),
-            "Postal Code": to_clean_str(order.get("Shipping Zip","")),
+            "Address 1": clean_cell(order["Shipping Street"]),
+            "Address 2": clean_cell(order["Shipping City"]),
+            "Postal Code": to_clean_str(order["Shipping Zip"]),
             "State": state,
             "Country": country,
-            "Deliver to": order.get("Shipping Name",""),
-            "Phone No.": to_clean_str(phone),
+            "Deliver to": clean_cell(order["Shipping Name"]),
+            "Phone No.": to_clean_str(format_phone(order["Shipping Phone"])),
             "Time Window": "0600-1800",
             "Group": "Made Active",
             "No. of Shipping Labels": labels,
             "Line Items": total_qty,
-            "Email": order.get("Email",""),
-            "Instructions": order.get("Notes","")
+            "Email": clean_cell(order["Email"]),
+            "Instructions": clean_cell(order["Notes"])
         })
 
     manifest_df = pd.DataFrame(manifest_rows)
 
-    # collect tags per order
-    tag_series = orders_df.groupby("Name")["Tags"].agg(lambda s: " ".join(map(str,s)))
+    tag_series = orders_df.groupby("Name")["Tags"].agg(lambda s: " ".join(map(clean_cell, s)))
     def names_with(tag):
         return tag_series[tag_series.str.contains(tag, na=False)].index.tolist()
 
@@ -127,7 +132,6 @@ def run():
     cx_names = names_with("CX")
     dk_names = names_with("DK")
 
-    # EXCLUDE DK from Other
     all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names) | set(dk_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]
@@ -143,16 +147,17 @@ def run():
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df = df.copy()
-                df["Phone No."] = df["Phone No."].astype(str)
-                df["Postal Code"] = df["Postal Code"].astype(str)
+                for col in ["Phone No.","Postal Code"]:
+                    if col in df.columns:
+                        df[col] = df[col].astype(str)
                 df.to_excel(writer, index=False, sheet_name='Manifest')
-                workbook = writer.book
+                wb = writer.book
                 ws = writer.sheets['Manifest']
-                text_fmt = workbook.add_format({'num_format': '@'})
-                for col_name in ["Phone No.","Postal Code"]:
-                    if col_name in df.columns:
-                        cidx = df.columns.get_loc(col_name)
-                        ws.set_column(cidx, cidx, None, text_fmt)
+                text_fmt = wb.add_format({'num_format': '@'})
+                for col in ["Phone No.","Postal Code"]:
+                    if col in df.columns:
+                        idx = df.columns.get_loc(col)
+                        ws.set_column(idx, idx, None, text_fmt)
             zipf.writestr(filename, buffer.getvalue())
 
         def add_csv_to_zip(df, filename):
@@ -166,41 +171,45 @@ def run():
         add_to_zip_excel(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip_excel(other_manifest, "Other_Manifest.xlsx")
 
-        # DK Distribution (CSV) — MA NSW are Residential
+        # DK Distribution — NSW via DK, all Residential for MADE
         if len(dk_names) > 0:
             dk_src = orders_df[orders_df["Name"].isin(dk_names)]
             dk_rows = []
             dk_date_str = (datetime.now() + timedelta(days=2)).strftime("%d/%m/%Y")
             for order_name, group in dk_src.groupby("Name", sort=False):
-                mrow = manifest_df[manifest_df["D.O. No."] == to_clean_str(order_name)].iloc[0]
-                delivery_type = "Residential"
-                ship_company = group["Shipping Company"].dropna().astype(str).str.strip()
-                location = ship_company.iloc[0] if not ship_company.empty and ship_company.iloc[0] not in ["", "nan", "NaN"] else ""
-                email_vals = group["Email"].dropna().astype(str).unique()
-                email = email_vals[0] if len(email_vals) else ""
-                notes_vals = group["Notes"].dropna().astype(str).unique()
-                notes_val = notes_vals[0] if len(notes_vals) else ""
-                state_abbrev_vals = group["Shipping Province"].dropna().astype(str).unique()
-                state_abbrev = state_abbrev_vals[0] if len(state_abbrev_vals) else ""
+                order_name_clean = to_clean_str(order_name)
+                mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
+
+                ship_company = clean_cell(group["Shipping Company"].iloc[0]) if len(group) else ""
+                location = ship_company
+
+                email_vals = [clean_cell(x) for x in group["Email"].unique() if clean_cell(x)]
+                email = email_vals[0] if email_vals else ""
+
+                notes_vals = [clean_cell(x) for x in group["Notes"].unique() if clean_cell(x)]
+                notes_val = notes_vals[0] if notes_vals else ""
+
+                state_vals = [clean_cell(x) for x in group["Shipping Province"].unique() if clean_cell(x)]
+                state_abbrev = state_vals[0] if state_vals else ""
 
                 dk_rows.append({
-                    "Order ID": to_clean_str(order_name),
+                    "Order ID": order_name_clean,
                     "Date": dk_date_str,
                     "Time Window": "7am - 6pm",
                     "Notes": notes_val,
-                    "Address 1": mrow["Address 1"],
+                    "Address 1": clean_cell(mrow["Address 1"]),
                     "Address 2": "",
                     "Address 3": "",
                     "Postal Code": to_clean_str(mrow["Postal Code"]),
-                    "City": mrow["Address 2"],
+                    "City": clean_cell(mrow["Address 2"]),
                     "State": state_abbrev,
                     "Country": "Australia",
                     "Location": location,
                     "Last Name": "",
                     "Phone": to_clean_str(mrow["Phone No."]),
-                    "Delivery Instructions": mrow["Instructions"],
+                    "Delivery Instructions": clean_cell(mrow["Instructions"]),
                     "Email": email,
-                    "DELIVERY TYPE": delivery_type,
+                    "DELIVERY TYPE": "Residential",
                     "Volume": to_intish_str(mrow["No. of Shipping Labels"]),
                     "NOTES": ""
                 })

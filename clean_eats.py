@@ -166,46 +166,12 @@ def run():
                         ws.set_column(idx, idx, None, text_fmt)
             zipf.writestr(filename, buffer.getvalue())
 
-        def add_csv_to_zip(df, filename):
-            if df.empty: return
-            zipf.writestr(filename, df.to_csv(index=False).encode('utf-8-sig'))
-
         add_to_zip_excel(cm_manifest, "CM_Manifest.xlsx")
         add_to_zip_excel(mc_manifest, "MC_Manifest.xlsx")
         add_to_zip_excel(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip_excel(other_manifest, "Other_Manifest.xlsx")
 
-        # CX Ready (unchanged)
-        if not cx_manifest.empty:
-            cx_ready_body = pd.DataFrame({
-                "INV NO.": cx_manifest["D.O. No."],
-                "DELIVERY DATE": pd.to_datetime(cx_manifest["Date"], format="%d/%m/%Y", errors='coerce') + timedelta(days=1),
-                "STORE NO": "",
-                "STORE NAME": cx_manifest["Deliver to"],
-                "ADDRESS": cx_manifest["Address 1"],
-                "SUBURB": cx_manifest["Address 2"],
-                "STATE": cx_manifest["State"],
-                "POSTCODE": cx_manifest["Postal Code"],
-                "CARTONS": cx_manifest["No. of Shipping Labels"],
-                "PALLETS": "",
-                "WEIGHT (KG)": (pd.to_numeric(cx_manifest["Line Items"], errors="coerce").fillna(0) * 0.4).round(2),
-                "INV. VALUE": "",
-                "COD": "",
-                "TEMP": "chilled",
-                "COMMENT": cx_manifest["Instructions"]
-            })
-            cx_ready_body["DELIVERY DATE"] = cx_ready_body["DELIVERY DATE"].dt.strftime("%d/%m/%Y")
-            wb = load_workbook("cx_manifest_template.xlsx"); ws = wb.active
-            for r_idx, row in enumerate(dataframe_to_rows(cx_ready_body, index=False, header=False), start=6):
-                for c_idx, value in enumerate(row, start=1):
-                    cell = ws.cell(row=r_idx, column=c_idx)
-                    if cell.coordinate in ws.merged_cells: continue
-                    cell.value = "" if pd.isna(value) else str(value)
-            with NamedTemporaryFile() as tmp:
-                wb.save(tmp.name); tmp.seek(0)
-                zipf.writestr("CX_Ready_Manifest.xlsx", tmp.read())
-
-        # DK Distribution (CSV) — Date = Melbourne today + 2 days
+        # DK Distribution (Excel now)
         if len(dk_names) > 0:
             dk_src = orders_df[orders_df["Name"].isin(dk_names)]
             dk_rows = []
@@ -215,7 +181,6 @@ def run():
             for order_name, group in dk_src.groupby("Name", sort=False):
                 order_name_clean = to_clean_str(order_name)
                 mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
-
                 code = order_name_clean.upper()
                 delivery_type = "Commercial" if code.startswith("CEW") else "Residential"
 
@@ -254,12 +219,8 @@ def run():
                     "NOTES": ""
                 })
 
-            dk_df = pd.DataFrame(dk_rows, columns=[
-                "Order ID","Date","Time Window","Notes","Address 1","Address 2","Address 3",
-                "Postal Code","City","State","Country","Location","Last Name","Phone",
-                "Delivery Instructions","Email","DELIVERY TYPE","Volume","NOTES"
-            ])
-            add_csv_to_zip(dk_df, "DK_Manifest.csv")
+            dk_df = pd.DataFrame(dk_rows)
+            add_to_zip_excel(dk_df, "DK_Manifest.xlsx")
 
     output.seek(0)
     st.download_button(

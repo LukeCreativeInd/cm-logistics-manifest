@@ -147,7 +147,7 @@ def run():
     # Collect tags per order (normalised)
     tag_series = orders_df.groupby("Name")["Tags"].agg(lambda s: " ".join(map(clean_cell, s)))
     def names_with(tag):
-        return tag_series[tag_series.str.contains(tag, na=False)].index.tolist()
+        return tag_series[tag_series.str.contains(tag, na=False, case=False)].index.tolist()
 
     cm_names = names_with("CM")
     mc_names = names_with("MC")
@@ -251,8 +251,15 @@ def run():
                 order_name_clean = to_clean_str(order_name)
                 mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
 
-                tags_blob = " ".join(map(clean_cell, group["Tags"].unique()))
-                delivery_type = "Commercial" if "CEW" in tags_blob else "Residential"
+                # DELIVERY TYPE: robust match on tags (case-insensitive, word boundary)
+                tags_blob = " ".join([clean_cell(x) for x in group["Tags"].tolist()])
+                tags_up = tags_blob.upper()
+                if re.search(r"\bCEW\b", tags_up):
+                    delivery_type = "Commercial"
+                elif re.search(r"\bCEA\b", tags_up):
+                    delivery_type = "Residential"
+                else:
+                    delivery_type = "Residential"
 
                 # Location = Shipping Company if present, else Shipping Name
                 ship_company = clean_cell(group["Shipping Company"].iloc[0]) if len(group) else ""
@@ -295,6 +302,11 @@ def run():
                 "Postal Code","City","State","Country","Location","Last Name","Phone",
                 "Delivery Instructions","Email","DELIVERY TYPE","Volume","NOTES"
             ])
+            def add_csv_to_zip(df, filename):
+                if df.empty:
+                    return
+                csv_buffer = df.to_csv(index=False).encode('utf-8-sig')
+                zipf.writestr(filename, csv_buffer)
             add_csv_to_zip(dk_df, "DK_Manifest.csv")
 
     output.seek(0)

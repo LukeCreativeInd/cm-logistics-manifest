@@ -151,8 +151,7 @@ def run():
                 "Line Items": "",
                 "Instructions": ""
             }
-            mc_manifest = pd.concat([mc_manifest, pd.DataFrame([cold_row])], ignore_index=True)
-
+    
         # --- Polar Parcel Manifest Logic ---
         polar_states = ["New South Wales", "Australian Capital Territory"]
         polar_df = manifest_df[manifest_df["State"].isin(polar_states)]

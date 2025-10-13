@@ -94,6 +94,7 @@ def run():
     cm_names = orders_df[orders_df["Tags"].str.contains("CM")]["Name"].unique()
     mc_names = orders_df[orders_df["Tags"].str.contains("MC")]["Name"].unique()
     cx_names = orders_df[orders_df["Tags"].str.contains("CX")]["Name"].unique()
+    dk_names = orders_df[orders_df["Tags"].str.contains("DK")]["Name"].unique()
     all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]
@@ -101,13 +102,9 @@ def run():
     cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
-    # --- Polar Parcel Manifest Logic ---
-    polar_states = ["New South Wales", "Australian Capital Territory"]
-    polar_df = manifest_df[manifest_df["State"].isin(polar_states)]
-
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
-        def add_to_zip(df, filename):
+        def add_to_zip_excel(df, filename):
             if df.empty:
                 return
             buffer = BytesIO()
@@ -121,55 +118,64 @@ def run():
                 worksheet.set_column(col_index, col_index, None, text_fmt)
             zipf.writestr(filename, buffer.getvalue())
 
-        add_to_zip(cm_manifest, "CM_Manifest.xlsx")
-        add_to_zip(mc_manifest, "MC_Manifest.xlsx")
-        add_to_zip(cx_manifest, "CX_Manifest.xlsx")
-        add_to_zip(other_manifest, "Other_Manifest.xlsx")
+        def add_csv_to_zip(df, filename):
+            if df.empty:
+                return
+            csv_buffer = df.to_csv(index=False).encode('utf-8-sig')
+            zipf.writestr(filename, csv_buffer)
 
-        # --- Polar Parcel Manifest Generation ---
-        if not polar_df.empty:
-            polar_orders = []
-            for _, row in polar_df.iterrows():
-                polar_orders.append([
-                    "Made Active",             # Seller Name
-                    row["D.O. No."],          # Order No.
-                    row["Deliver to"],        # Customer Name
-                    row["Address 1"],         # Address
-                    row["Address 2"],         # City
-                    row["Postal Code"],       # Postcode
-                    str(row["Phone No."]) if row["Phone No."] else "",  # Phone as text
-                    row["Email"],             # Email
-                    row["Instructions"],      # Delivery Notes
-                    row["No. of Shipping Labels"]  # Cartons
-                ])
+        add_to_zip_excel(cm_manifest, "CM_Manifest.xlsx")
+        add_to_zip_excel(mc_manifest, "MC_Manifest.xlsx")
+        add_to_zip_excel(cx_manifest, "CX_Manifest.xlsx")
+        add_to_zip_excel(other_manifest, "Other_Manifest.xlsx")
 
-            wb = Workbook()
-            ws = wb.active
+        # DK Distribution Manifest (CSV) - NSW orders for Made are Residential
+        if len(dk_names) > 0:
+            dk_src = orders_df[orders_df["Name"].isin(dk_names)]
+            dk_rows = []
+            dk_date_str = (datetime.now() + timedelta(days=2)).strftime("%d/%m/%Y")
+            for order_name, group in dk_src.groupby("Name", sort=False):
+                mrow = manifest_df[manifest_df["D.O. No."] == order_name].iloc[0]
+                # Delivery type fixed to Residential for Made Active
+                delivery_type = "Residential"
+                ship_company = group["Shipping Company"].dropna().astype(str).str.strip()
+                location = ship_company.iloc[0] if not ship_company.empty and ship_company.iloc[0] not in ["", "nan", "NaN"] else ""
+                phone = mrow["Phone No."]
+                email_vals = group["Email"].dropna().astype(str).unique()
+                email = email_vals[0] if len(email_vals) else ""
+                notes_vals = group["Notes"].dropna().astype(str).unique()
+                notes_val = notes_vals[0] if len(notes_vals) else ""
+                instr = mrow["Instructions"]
+                state_abbrev_vals = group["Shipping Province"].dropna().astype(str).unique()
+                state_abbrev = state_abbrev_vals[0] if len(state_abbrev_vals) else ""
 
-            # Row 1: "Delivery Date" (A1), <date + 2 days> (B1)
-            ws["A1"] = "Delivery Date"
-            delivery_date = (datetime.now() + timedelta(days=2)).strftime("%d/%m/%Y")
-            ws["B1"] = delivery_date
-
-            # Row 2: Headers (A2:J2)
-            headers = [
-                "Seller Name", "Order No.", "Customer Name", "Address", "City",
-                "Postcode", "Phone", "Email", "Delivery Notes", "Cartons"
-            ]
-            for col_num, header in enumerate(headers, 1):
-                ws.cell(row=2, column=col_num, value=header)
-
-            # Order data (Row 3 down), with phone as text
-            for row_idx, order in enumerate(polar_orders, start=3):
-                for col_idx, value in enumerate(order, start=1):
-                    cell = ws.cell(row=row_idx, column=col_idx, value=value)
-                    if col_idx == 7:  # Phone column
-                        cell.number_format = '@'
-
-            with NamedTemporaryFile() as tmp:
-                wb.save(tmp.name)
-                tmp.seek(0)
-                zipf.writestr("Polar_Parcel_Manifest.xlsx", tmp.read())
+                dk_rows.append({
+                    "Order ID": order_name,
+                    "Date": dk_date_str,
+                    "Time Window": "7am - 6pm",
+                    "Notes": notes_val,
+                    "Address 1": mrow["Address 1"],
+                    "Address 2": "",
+                    "Address 3": "",
+                    "Postal Code": mrow["Postal Code"],
+                    "City": mrow["Address 2"],
+                    "State": state_abbrev,
+                    "Country": "Australia",
+                    "Location": location,
+                    "Last Name": "",
+                    "Phone": phone,
+                    "Delivery Instructions": instr,
+                    "Email": email,
+                    "DELIVERY TYPE": delivery_type,
+                    "Volume": mrow["No. of Shipping Labels"],
+                    "NOTES": ""
+                })
+            dk_df = pd.DataFrame(dk_rows, columns=[
+                "Order ID","Date","Time Window","Notes","Address 1","Address 2","Address 3",
+                "Postal Code","City","State","Country","Location","Last Name","Phone",
+                "Delivery Instructions","Email","DELIVERY TYPE","Volume","NOTES"
+            ])
+            add_csv_to_zip(dk_df, "DK_Manifest.csv")
 
     output.seek(0)
     st.download_button(

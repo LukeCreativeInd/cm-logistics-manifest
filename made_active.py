@@ -5,6 +5,7 @@ import zipfile
 from io import BytesIO
 import re
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 NAN_LIKE = {"nan", "none", "null", ""}
 
@@ -64,13 +65,9 @@ def run():
             orders_df[c] = ""
 
     bundle_map = {
-        "10 Pack": 10,
-        "20 Pack": 20,
-        "30 Pack": 30,
-        "10 Meal Christmas Bundle": 10,
-        "14 Meal Christmas Bundle": 14,
-        "High Protein Pack": 12,
-        "The Bunny Bundle": 10
+        "10 Pack": 10, "20 Pack": 20, "30 Pack": 30,
+        "10 Meal Christmas Bundle": 10, "14 Meal Christmas Bundle": 14,
+        "High Protein Pack": 12, "The Bunny Bundle": 10
     }
 
     manifest_rows = []
@@ -84,7 +81,6 @@ def run():
                 qty = int(float(qty_raw))
             except:
                 qty = 0
-
             if item in bundle_map:
                 total_qty += bundle_map[item] * qty
             else:
@@ -92,8 +88,8 @@ def run():
 
         labels = math.ceil(total_qty / 20) if total_qty else 0
 
-        state_map = {"VIC": "Victoria", "NSW": "New South Wales", "ACT": "Australian Capital Territory"}
-        country_map = {"AU": "Australia"}
+        state_map = {"VIC":"Victoria","NSW":"New South Wales","ACT":"Australian Capital Territory"}
+        country_map = {"AU":"Australia"}
         raw_state = clean_cell(order["Shipping Province"])
         raw_country = clean_cell(order["Shipping Country"])
         state = state_map.get(raw_state, raw_state)
@@ -124,14 +120,10 @@ def run():
     manifest_df = pd.DataFrame(manifest_rows)
 
     tag_series = orders_df.groupby("Name")["Tags"].agg(lambda s: " ".join(map(clean_cell, s)))
-    def names_with(tag):
-        return tag_series[tag_series.str.contains(tag, na=False)].index.tolist()
+    def names_with(tag): return tag_series[tag_series.str_contains(tag, na=False, case=False)].index.tolist() \
+        if hasattr(tag_series.str, "str_contains") else tag_series[tag_series.str.contains(tag, na=False, case=False)].index.tolist()
 
-    cm_names = names_with("CM")
-    mc_names = names_with("MC")
-    cx_names = names_with("CX")
-    dk_names = names_with("DK")
-
+    cm_names = names_with("CM"); mc_names = names_with("MC"); cx_names = names_with("CX"); dk_names = names_with("DK")
     all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names) | set(dk_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]
@@ -142,17 +134,14 @@ def run():
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
         def add_to_zip_excel(df, filename):
-            if df.empty:
-                return
+            if df.empty: return
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 df = df.copy()
                 for col in ["Phone No.","Postal Code"]:
-                    if col in df.columns:
-                        df[col] = df[col].astype(str)
+                    if col in df.columns: df[col] = df[col].astype(str)
                 df.to_excel(writer, index=False, sheet_name='Manifest')
-                wb = writer.book
-                ws = writer.sheets['Manifest']
+                wb = writer.book; ws = writer.sheets['Manifest']
                 text_fmt = wb.add_format({'num_format': '@'})
                 for col in ["Phone No.","Postal Code"]:
                     if col in df.columns:
@@ -161,26 +150,25 @@ def run():
             zipf.writestr(filename, buffer.getvalue())
 
         def add_csv_to_zip(df, filename):
-            if df.empty:
-                return
-            csv_buffer = df.to_csv(index=False).encode('utf-8-sig')
-            zipf.writestr(filename, csv_buffer)
+            if df.empty: return
+            zipf.writestr(filename, df.to_csv(index=False).encode('utf-8-sig'))
 
         add_to_zip_excel(cm_manifest, "CM_Manifest.xlsx")
         add_to_zip_excel(mc_manifest, "MC_Manifest.xlsx")
         add_to_zip_excel(cx_manifest, "CX_Manifest.xlsx")
         add_to_zip_excel(other_manifest, "Other_Manifest.xlsx")
 
-        # DK Distribution — NSW via DK, all Residential for MADE
+        # DK Distribution (CSV) — Date = Melbourne today + 2 days, MADE always Residential
         if len(dk_names) > 0:
             dk_src = orders_df[orders_df["Name"].isin(dk_names)]
             dk_rows = []
-            dk_date_str = (datetime.now() + timedelta(days=2)).strftime("%d/%m/%Y")
+            today_mel = datetime.now(ZoneInfo("Australia/Melbourne")).date()
+            dk_date_str = (today_mel + timedelta(days=2)).strftime("%d/%m/%Y")
+
             for order_name, group in dk_src.groupby("Name", sort=False):
                 order_name_clean = to_clean_str(order_name)
                 mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
 
-                # Location = Shipping Company if present, else Shipping Name
                 ship_company = clean_cell(group["Shipping Company"].iloc[0]) if len(group) else ""
                 ship_name = clean_cell(group["Shipping Name"].iloc[0]) if len(group) else ""
                 location = ship_company if ship_company else ship_name

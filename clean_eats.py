@@ -251,12 +251,12 @@ def run():
                 order_name_clean = to_clean_str(order_name)
                 mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
 
-                # DELIVERY TYPE: robust match on tags (case-insensitive, word boundary)
-                tags_blob = " ".join([clean_cell(x) for x in group["Tags"].tolist()])
-                tags_up = tags_blob.upper()
-                if re.search(r"\bCEW\b", tags_up):
+                # DELIVERY TYPE from ORDER NUMBER prefix (case-insensitive):
+                # CEW* -> Commercial, CEA* -> Residential
+                code = order_name_clean.upper()
+                if code.startswith("CEW"):
                     delivery_type = "Commercial"
-                elif re.search(r"\bCEA\b", tags_up):
+                elif code.startswith("CEA"):
                     delivery_type = "Residential"
                 else:
                     delivery_type = "Residential"

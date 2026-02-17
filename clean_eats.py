@@ -58,7 +58,7 @@ def run():
         return
 
     orders_df = pd.read_csv(uploaded_file, dtype=str, keep_default_na=False)
-    orders_df = orders_df.applymap(clean_cell)
+    orders_df = orders_df.map(clean_cell)
     orders_df.columns = orders_df.columns.str.strip()
 
     expected_cols = [
@@ -145,7 +145,9 @@ def run():
         return comp if comp else name
 
     if not mc_manifest.empty:
-        fallback = orders_df.groupby("Name").apply(company_or_name).to_dict()
+        # Future-proof (avoid GroupBy.apply behavior changes): prefer Shipping Company, else Shipping Name
+        fb = orders_df.groupby("Name", sort=False)[["Shipping Company", "Shipping Name"]].first().fillna("")
+        fallback = fb["Shipping Company"].where(fb["Shipping Company"].astype(str).str.strip() != "", fb["Shipping Name"]).to_dict()
         mc_manifest = mc_manifest.copy()
         mc_manifest["Deliver to"] = mc_manifest["D.O. No."].map(fallback).fillna("")
 

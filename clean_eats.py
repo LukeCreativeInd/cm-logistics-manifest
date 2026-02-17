@@ -189,7 +189,7 @@ def run():
 
             # Header cells
             ws["B3"].value = "Clean Eats Australia"
-            ws["D4"].value = cx_date_str
+            ws["B4"].value = cx_date_str
 
             start_row = 6
             current_row = start_row

@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from tempfile import NamedTemporaryFile
+from pathlib import Path
 
 NAN_LIKE = {"nan", "none", "null", ""}
 
@@ -115,7 +116,7 @@ def run():
             "Postal Code": to_clean_str(order["Shipping Zip"]),
             "State": state,
             "Country": country,
-            "Deliver to": clean_cell(order["Shipping Name"]),
+            "Deliver to": (clean_cell(order.get("Shipping Company", "")) or clean_cell(order.get("Shipping Name", ""))),
             "Phone No.": to_clean_str(format_phone(order["Shipping Phone"])),
             "Time Window": "0600-1800",
             "Group": "Clean Eats Australia",
@@ -168,67 +169,69 @@ def run():
 
         add_to_zip_excel(cm_manifest, "CM_Manifest.xlsx")
         add_to_zip_excel(mc_manifest, "MC_Manifest.xlsx")
-        # CX Manifest (Cold Xpress template)
+        # CX Cold Xpress (populate template)
         if not cx_manifest.empty:
+            template_path = Path(__file__).resolve().parent / "cx_manifest_template.xlsx"
+            if not template_path.exists():
+                template_path = Path("cx_manifest_template.xlsx")
+            wb_cx = load_workbook(template_path)
+            ws_cx = wb_cx["Sheet1"] if "Sheet1" in wb_cx.sheetnames else wb_cx.active
+
             today_mel = datetime.now(ZoneInfo("Australia/Melbourne")).date()
             cx_date_str = (today_mel + timedelta(days=1)).strftime("%d/%m/%Y")
-            wb_cx = load_workbook("cx_manifest_template.xlsx")
-            ws_cx = wb_cx.active
-            # Header cells (template uses merged B3:C3 and B4:C4)
+
+            # Header cells
             ws_cx["B3"] = "Clean Eats Australia"
-            ws_cx["B4"] = cx_date_str
-        
+            ws_cx["B4"] = cx_date_str  # merged B4:C4 in template
+
+            # Shopify lookups (raw export)
+            addr1_lu = orders_df.groupby("Name")["Shipping Address1"].first().to_dict()
+            street_lu = orders_df.groupby("Name")["Shipping Street"].first().to_dict()
+            city_lu = orders_df.groupby("Name")["Shipping City"].first().to_dict()
+            zip_lu = orders_df.groupby("Name")["Shipping Zip"].first().to_dict()
+            prov_name_lu = orders_df.groupby("Name")["Shipping Province Name"].first().to_dict() if "Shipping Province Name" in orders_df.columns else {}
+            prov_lu = orders_df.groupby("Name")["Shipping Province"].first().to_dict()
+            notes_lu = orders_df.groupby("Name")["Notes"].first().to_dict()
+
             start_row = 6
-            for idx_row, mrow in enumerate(cx_manifest.itertuples(index=False), start=0):
-                m = mrow._asdict()
-                inv_no = clean_cell(m.get("D.O. No.", ""))
-                # Pull raw Shopify fields for this order
-                og = orders_df[orders_df["Name"] == inv_no]
-                first = og.iloc[0] if len(og) else {}
-        
-                store_name = clean_cell(first.get("Shipping Name", "")) if len(og) else ""
-                address = clean_cell(first.get("Shipping Address1", "")) if len(og) else ""
-                if not address:
-                    address = clean_cell(first.get("Shipping Street", "")) if len(og) else ""
-                suburb = clean_cell(first.get("Shipping City", "")) if len(og) else ""
-                state_full = clean_cell(first.get("Shipping Province", "")) if len(og) else ""
-                postcode_raw = to_clean_str(first.get("Shipping Zip", "")) if len(og) else ""
-                postcode = re.sub(r"\D", "", postcode_raw)
-                comment = clean_cell(first.get("Notes", "")) if len(og) else ""
-        
-                meals = m.get("Line Items", 0) or 0
-                try:
-                    meals = float(meals)
-                except Exception:
-                    meals = 0.0
-                cartons = m.get("No. of Shipping Labels", 0) or 0
-                try:
-                    cartons = int(float(cartons))
-                except Exception:
-                    cartons = 0
+            for row_idx, (_, r) in enumerate(cx_manifest.iterrows(), start=start_row):
+                order_name = to_clean_str(r.get("D.O. No.", ""))
+
+                inv_no = order_name
+                delivery_date = cx_date_str
+                store_no = ""
+                store_name = clean_cell(r.get("Deliver to", ""))
+
+                address = clean_cell(addr1_lu.get(order_name, "")) or clean_cell(street_lu.get(order_name, ""))
+                suburb = clean_cell(city_lu.get(order_name, ""))
+
+                state_full = clean_cell(prov_name_lu.get(order_name, "")) or clean_cell(prov_lu.get(order_name, ""))
+
+                raw_post = zip_lu.get(order_name, "")
+                postcode = re.sub(r"\D", "", str(raw_post))
+
+                cartons = int(r.get("No. of Shipping Labels", 0) or 0)
+
+                meals = float(r.get("Line Items", 0) or 0)
                 weight = round(meals * 0.380, 2)
-        
-                r = start_row + idx_row
-                # Column map (A=1 .. O=15) as per CX template
-                ws_cx.cell(r, 1, inv_no)          # INV NO.
-                ws_cx.cell(r, 2, cx_date_str)      # DELIVERY DATE
-                ws_cx.cell(r, 3, "")              # STORE NO (blank)
-                ws_cx.cell(r, 4, store_name)      # STORE NAME
-                ws_cx.cell(r, 5, address)         # ADDRESS
-                ws_cx.cell(r, 6, suburb)          # SUBURB
-                ws_cx.cell(r, 7, state_full)      # STATE (full)
-                ws_cx.cell(r, 8, postcode)        # POSTCODE (digits)
-                ws_cx.cell(r, 9, cartons)         # CARTONS
-                ws_cx.cell(r, 10, "")             # PALLETS (blank)
-                ws_cx.cell(r, 11, weight)         # WEIGHT (KG)
-                ws_cx.cell(r, 12, "")             # INV. VALUE (blank)
-                ws_cx.cell(r, 13, "")             # COD (blank)
-                ws_cx.cell(r, 14, "Chilled")      # TEMP
-                ws_cx.cell(r, 15, comment)        # COMMENT
-        
-            cx_buf = BytesIO()
-            wb_cx.save(cx_buf)
-            zipf.writestr("CX_Manifest.xlsx", cx_buf.getvalue())
+
+                inv_value = ""
+                cod = ""
+                pallets = ""
+                temp = "Chilled"
+                comment = clean_cell(notes_lu.get(order_name, ""))
+
+                values = [
+                    inv_no, delivery_date, store_no, store_name, address, suburb, state_full, postcode,
+                    cartons, pallets, weight, inv_value, cod, temp, comment
+                ]
+
+                for col_idx, val in enumerate(values, start=1):
+                    ws_cx.cell(row=row_idx, column=col_idx, value=val)
+
+            cx_buffer = BytesIO()
+            wb_cx.save(cx_buffer)
+            zipf.writestr("CX_Manifest.xlsx", cx_buffer.getvalue())
         add_to_zip_excel(other_manifest, "Other_Manifest.xlsx")
 
         # DK Distribution (Excel now)

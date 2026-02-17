@@ -52,7 +52,7 @@ def run():
         return
 
     orders_df = pd.read_csv(uploaded_file, dtype=str, keep_default_na=False)
-    orders_df = orders_df.applymap(clean_cell)
+    orders_df = orders_df.map(clean_cell)
     orders_df.columns = orders_df.columns.str.strip()
 
     expected_cols = [

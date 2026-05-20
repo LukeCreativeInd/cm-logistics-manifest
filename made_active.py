@@ -142,6 +142,19 @@ def run():
     cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
+    def add_cartons_after_shipping_labels(df: pd.DataFrame) -> pd.DataFrame:
+        if df.empty or "No. of Shipping Labels" not in df.columns:
+            return df
+        df = df.copy()
+        if "Cartons" in df.columns:
+            df = df.drop(columns=["Cartons"])
+        insert_at = df.columns.get_loc("No. of Shipping Labels") + 1
+        df.insert(insert_at, "Cartons", df["No. of Shipping Labels"])
+        return df
+
+    # CM Logistics wants Cartons shown as its own column, immediately after Shipping Labels.
+    cm_manifest = add_cartons_after_shipping_labels(cm_manifest)
+
     output = BytesIO()
     with zipfile.ZipFile(output, "w") as zipf:
         def add_to_zip_excel(df, filename):
@@ -175,11 +188,12 @@ def run():
             dk_rows = []
 
             today_mel = datetime.now(ZoneInfo("Australia/Melbourne")).date()
-            dk_date_str = (today_mel + timedelta(days=2)).strftime("%d/%m/%Y")
+            fallback_dk_date_str = (today_mel + timedelta(days=2)).strftime("%d/%m/%Y")
 
             for order_name, group in dk_src.groupby("Name", sort=False):
                 order_name_clean = to_clean_str(order_name)
                 mrow = manifest_df[manifest_df["D.O. No."] == order_name_clean].iloc[0]
+                dk_date_str = clean_cell(mrow.get("Date", "")) or fallback_dk_date_str
 
                 # Location = Shipping Company if present, else Shipping Name
                 ship_company = clean_cell(group["Shipping Company"].iloc[0]) if len(group) else ""

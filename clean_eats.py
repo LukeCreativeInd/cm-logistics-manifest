@@ -77,6 +77,26 @@ def run():
     ]
     family_double_items = ["Family Mac and 3 Cheese Pasta Bake","Baked Family Lasagna"]
 
+    # POS / merchandise items are paper-based and can be added to an already full carton.
+    # They should stay on the Shopify order, but they must not increase meal carton counts.
+    non_meal_keywords = [
+        "poster", "wobbler", "fridge strip", "fridge strips", "pos",
+        "a2", "a3", "print", "prints", "point of sale", "merch", "merchandise"
+    ]
+
+    def is_bundle_parent(item_name: str) -> bool:
+        item_lower = item_name.lower()
+        return any(bundle.lower() in item_lower for bundle in bundle_items)
+
+    def is_non_meal_item(item_name: str) -> bool:
+        item_lower = item_name.lower()
+        return any(keyword in item_lower for keyword in non_meal_keywords)
+
+    def carton_capacity(order_name: object) -> int:
+        # CEW wholesale cartons fit 30 meals. Standard Clean Eats cartons fit 24 meals.
+        order_code = to_clean_str(order_name).upper()
+        return 30 if order_code.startswith("CEW") else 24
+
     manifest_rows = []
     for name, group in orders_df.groupby("Name", sort=False):
         order = group.iloc[0]
@@ -88,14 +108,20 @@ def run():
                 qty = int(float(qty_raw))
             except:
                 qty = 0
-            if any(bundle in item for bundle in bundle_items):
+
+            if not item or qty <= 0:
+                continue
+            if is_bundle_parent(item):
+                continue
+            if is_non_meal_item(item):
                 continue
             elif item in family_double_items:
                 total_qty += qty * 2
             else:
                 total_qty += qty
 
-        labels = math.ceil(total_qty / 24) if total_qty else 0
+        capacity = carton_capacity(name)
+        labels = math.ceil(total_qty / capacity) if total_qty else 0
 
         state_map = {"VIC": "Victoria","NSW":"New South Wales","ACT":"Australian Capital Territory"}
         country_map = {"AU":"Australia"}

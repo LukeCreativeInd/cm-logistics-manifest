@@ -95,7 +95,7 @@ def run():
     def carton_capacity(order_name: object) -> int:
         # CEW wholesale cartons fit 30 meals. Standard Clean Eats cartons fit 24 meals.
         order_code = to_clean_str(order_name).upper()
-        return 30 if order_code.startswith("CEW") else 24
+        return 24 if order_code.startswith("CEW") else 24
 
     manifest_rows = []
     for name, group in orders_df.groupby("Name", sort=False):

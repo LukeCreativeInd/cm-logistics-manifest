@@ -100,7 +100,7 @@ def build_hds_manifest(manifest_df: pd.DataFrame, prefix: str) -> pd.DataFrame:
             continue
 
         delivery_id = f"{prefix}{order_id}"
-        delivery_type = "commercial" if order_id.upper().startswith("CEW") else "residential"
+        delivery_type = "business" if order_id.upper().startswith("CEW") else "residential"
 
         shared = {
             "DeliveryId": delivery_id,

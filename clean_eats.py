@@ -11,6 +11,8 @@ from openpyxl.utils.dataframe import dataframe_to_rows
 from tempfile import NamedTemporaryFile
 from pathlib import Path
 
+from hds_manifest import hds_csv_bytes, order_names_with_tag
+
 NAN_LIKE = {"nan", "none", "null", ""}
 
 def clean_cell(x: object) -> str:
@@ -158,11 +160,13 @@ def run():
     def names_with(tag): return tag_series[tag_series.str.contains(tag, na=False, case=False)].index.tolist()
 
     cm_names = names_with("CM"); mc_names = names_with("MC"); cx_names = names_with("CX"); dk_names = names_with("DK")
-    all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names) | set(dk_names)
+    hds_names = order_names_with_tag(orders_df, "HDS")
+    all_tagged_names = set(cm_names) | set(mc_names) | set(cx_names) | set(dk_names) | set(hds_names)
 
     cm_manifest = manifest_df[manifest_df["D.O. No."].isin(cm_names)]
     mc_manifest = manifest_df[manifest_df["D.O. No."].isin(mc_names)]
     cx_manifest = manifest_df[manifest_df["D.O. No."].isin(cx_names)]
+    hds_manifest = manifest_df[manifest_df["D.O. No."].isin(hds_names)]
     other_manifest = manifest_df[~manifest_df["D.O. No."].isin(all_tagged_names)]
 
     def add_cartons_after_shipping_labels(df: pd.DataFrame) -> pd.DataFrame:
@@ -210,6 +214,8 @@ def run():
 
         add_to_zip_excel(cm_manifest, "CM_Manifest.xlsx")
         add_to_zip_excel(mc_manifest, "MC_Manifest.xlsx")
+        if not hds_manifest.empty:
+            zipf.writestr("HDS_Manifest.csv", hds_csv_bytes(hds_manifest, "CLEATS-"))
         # CX Cold Xpress (populate template)
         if not cx_manifest.empty:
             template_path = Path(__file__).resolve().parent / "cx_manifest_template.xlsx"

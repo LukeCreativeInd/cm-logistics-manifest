@@ -13,7 +13,7 @@ if "selected_group" not in st.session_state:
     st.session_state.selected_group = None
 
 # Horizontal buttons
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 
 with col1:
     if st.button("Clean Eats Australia"):
@@ -22,10 +22,6 @@ with col1:
 with col2:
     if st.button("Made Active"):
         st.session_state.selected_group = "Made Active"
-
-with col3:
-    if st.button("Elite Meals"):
-        st.session_state.selected_group = "Elite Meals"
 
 # Render group UI at full width
 selected = st.session_state.selected_group
@@ -37,7 +33,3 @@ if selected == "Clean Eats Australia":
 elif selected == "Made Active":
     import made_active
     made_active.run()
-
-elif selected == "Elite Meals":
-    import elite_meals
-    elite_meals.run()
